@@ -8,7 +8,7 @@ import android.view.View
 import kotlin.random.Random
 
 
-class SpaceInvadersView(context: Context) : View(context) {
+class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
     private lateinit var player: Player
     private val enemies = mutableListOf<Enemy>()
     private val bullets = mutableListOf<Bullet>()
@@ -17,7 +17,7 @@ class SpaceInvadersView(context: Context) : View(context) {
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private val numEnemyRows = 3
+    private val numEnemyRows = 5
     private val numEnemyCols = 5
     private val enemyPadding = 10f
     private var enemyWidth = 0f
@@ -25,6 +25,8 @@ class SpaceInvadersView(context: Context) : View(context) {
 
     private var speedMultiplier = 1f
     private var enemiesDestroyed = 0
+
+    private val explosions = mutableListOf<List<ExplosionParticle>>()
 
     init {
         // L'initialisation se fera dans onSizeChanged
@@ -45,7 +47,7 @@ class SpaceInvadersView(context: Context) : View(context) {
 
         // Initialiser les ennemis
         val startX = (screenWidth - (numEnemyCols * (enemyWidth + enemyPadding) - enemyPadding)) / 2
-        val startY = screenHeight / 8
+        val startY = screenHeight / 4
 
         for (row in 0 until numEnemyRows) {
             for (col in 0 until numEnemyCols) {
@@ -64,10 +66,52 @@ class SpaceInvadersView(context: Context) : View(context) {
         enemies.forEach { it.draw(canvas, paint) }
         bullets.forEach { it.draw(canvas, paint) }
 
+        explosions.forEach { explosion ->
+            explosion.forEach { it.draw(canvas, paint) }
+        }
+
         update()
         invalidate()
     }
 
+    private fun createExplosion(x: Float, y: Float, width: Float, height: Float, color: Int) {
+        val particleCount = 50
+        val particles = List(particleCount) {
+            ExplosionParticle(
+                x + Random.nextFloat() * width,
+                y + Random.nextFloat() * height,
+                20f, // taille des particules
+                Random.nextFloat() * 10 - 5, // vitesse x aléatoire
+                Random.nextFloat() * 10 - 5 , // vitesse y aléatoire
+                color
+            )
+        }
+        explosions.add(particles)
+    }
+
+    private fun createPlayerExplosion() {
+        val particleCount = 50
+        val particles = List(particleCount) {
+            ExplosionParticle(
+                player.x + Random.nextFloat() * player.size - player.size / 2,
+                player.y + Random.nextFloat() * player.size - player.size / 2,
+                20f,
+                Random.nextFloat() * 20 - 10,
+                Random.nextFloat() * 20 - 10,
+                Color.RED
+            )
+        }
+        explosions.add(particles)
+    }
+
+    private fun checkGameOver() {
+        if (player.lives <= 0) {
+            // Attendez un peu pour que l'explosion soit visible
+            postDelayed({
+                onGameOver()
+            }, 2000) // 2 secondes de délai
+        }
+    }
 
     private fun update() {
         bullets.forEach { it.move() }
@@ -83,14 +127,27 @@ class SpaceInvadersView(context: Context) : View(context) {
             enemiesDestroyed++
         }
 
-
         val bulletsToRemove = mutableListOf<Bullet>()
         val enemiesToRemove = mutableListOf<Enemy>()
+
+        for (enemy in enemies) {
+            if (player.intersects(enemy)) {
+                if (player.hit()) {
+                    createPlayerExplosion()
+                    checkGameOver()
+
+                    // Gérer la fin du jeu ici
+                }
+                enemies.remove(enemy)
+                break
+            }
+        }
 
         for (enemy in enemies) {
             for (bullet in bullets) {
                 if (bullet.intersects(enemy)) {
                     if (enemy.hit()) {
+                        createExplosion(enemy.x, enemy.y, enemy.width, enemy.height, Color.WHITE)
                         enemiesToRemove.add(enemy)
                     }
                     bulletsToRemove.add(bullet)
@@ -101,7 +158,14 @@ class SpaceInvadersView(context: Context) : View(context) {
 
         enemies.removeAll { it in enemiesToRemove }
         bullets.removeAll { it in bulletsToRemove }
+
+        explosions.forEach { explosion ->
+            explosion.forEach { it.update() }
+        }
+        explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
+
     }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_MOVE -> player.moveTo(event.x.coerceIn(0f, screenWidth))
@@ -115,17 +179,57 @@ class SpaceInvadersView(context: Context) : View(context) {
         enemies.remove(enemy)
         enemiesDestroyed++
     }
+
+
+
 }
 
 class Player(var x: Float, var y: Float, val size: Float) {
+    var lives = 3
+
     fun draw(canvas: Canvas, paint: Paint) {
-        paint.color = Color.GREEN
-        canvas.drawRect(x - size / 2, y - size / 2, x + size / 2, y + size / 2, paint)
+
+        paint.color = when (lives) {
+            3 -> Color.GREEN
+            2 -> Color.rgb(255, 165, 0) // Orange
+            1 -> Color.rgb(255, 204, 204)
+            else -> Color.TRANSPARENT
+        }
+
+        //canvas.drawRect(x - size / 2, y - size / 2, x + size / 2, y + size / 2, paint)
+        // Épaisseur du trait (ajustez la valeur selon vos préférences)
+        paint.strokeWidth = 5f
+
+        // Calcul des coordonnées des sommets du triangle
+        val halfSize = size / 2
+        val topX = x
+        val topY = y - halfSize
+        val bottomLeftX = x - halfSize
+        val bottomLeftY = y + halfSize
+        val bottomRightX = x + halfSize
+        val bottomRightY = y + halfSize
+
+        // Dessin du triangle
+        canvas.drawLine(topX, topY, bottomLeftX, bottomLeftY, paint)
+        canvas.drawLine(bottomLeftX, bottomLeftY, bottomRightX, bottomRightY, paint)
+        canvas.drawLine(bottomRightX, bottomRightY, topX, topY, paint)
     }
 
     fun moveTo(newX: Float) {
         x = newX
     }
+
+    fun hit(): Boolean {
+        lives--
+        return lives <= 0
+    }
+
+    fun intersects(enemy: Enemy): Boolean {
+        return x + size / 2 > enemy.x && x - size / 2 < enemy.x + enemy.width &&
+                y + size / 2 > enemy.y && y - size / 2 < enemy.y + enemy.height
+    }
+
+
 }
 
 class Enemy(var x: Float, var y: Float, val width: Float, val height: Float) {
@@ -133,14 +237,43 @@ class Enemy(var x: Float, var y: Float, val width: Float, val height: Float) {
     private var dx = Random.nextFloat() * 8 - 4 // Vitesse horizontale aléatoire entre -4 et 4
     private var dy = Random.nextFloat() * 8 - 4 // Vitesse verticale aléatoire entre -4 et 4
 
+    private var rotationAngle = 0f
+    private var rotationSpeed = 2f // Ajustez la vitesse de rotation selon vos préférences
+
     fun draw(canvas: Canvas, paint: Paint) {
         paint.color = when (hitsToDestroy) {
-            3 -> Color.RED
+            3 -> Color.rgb(255, 204, 204) // Rouge vif (255, 0, 0)
             2 -> Color.rgb(255, 165, 0) // Orange
             1 -> Color.WHITE
             else -> Color.TRANSPARENT
         }
-        canvas.drawRect(x, y, x + width, y + height, paint)
+
+        // Épaisseur du trait (ajustez la valeur selon vos préférences)
+        paint.strokeWidth = 5f
+
+        canvas.save() // Sauvegarder l'état du canvas
+
+        // Rotation autour du centre du triangle
+        canvas.rotate(rotationAngle, x + width / 2, y + height / 2)
+
+        // Calculer les coordonnées des sommets du triangle après rotation
+        val halfWidth = width / 2
+        val topX = x + halfWidth
+        val topY = y
+        val bottomLeftX = x
+        val bottomLeftY = y + height
+        val bottomRightX = x + width
+        val bottomRightY = y + height
+
+        // Dessiner le triangle en utilisant drawLine()
+        canvas.drawLine(topX, topY, bottomLeftX, bottomLeftY, paint)
+        canvas.drawLine(bottomLeftX, bottomLeftY, bottomRightX, bottomRightY, paint)
+        canvas.drawLine(bottomRightX, bottomRightY, topX, topY, paint)
+
+        canvas.restore() // Restaurer l'état du canvas
+
+        // Mise à jour de l'angle de rotation
+        rotationAngle = (rotationAngle + rotationSpeed) % 360
     }
 
     fun hit(): Boolean {
@@ -186,4 +319,30 @@ class Bullet(var x: Float, var y: Float) {
         return x > enemy.x && x < enemy.x + enemy.width &&
                 y > enemy.y && y < enemy.y + enemy.height
     }
+}
+
+class ExplosionParticle(
+    var x: Float,
+    var y: Float,
+    private val size: Float,
+    private val dx: Float,
+    private val dy: Float,
+    private val color: Int
+
+) {
+    var alpha = 255
+
+    fun update(): Boolean {
+        x += dx
+        y += dy
+        alpha -= 2  // Réduisez cette valeur pour une disparition plus lente
+        return alpha > 0
+    }
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        paint.color = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
+        canvas.drawRect(x - size/2, y - size/2, x + size/2, y + size/2, paint)
+    }
+
+    fun isAlive(): Boolean = alpha > 0
 }
