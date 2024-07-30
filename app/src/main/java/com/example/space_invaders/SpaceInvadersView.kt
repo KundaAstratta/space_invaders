@@ -28,6 +28,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     private val explosions = mutableListOf<List<ExplosionParticle>>()
 
+    private val duplicationInterval = 5000L // Intervalle de duplication en millisecondes (5 secondes)
+    private var lastDuplicationTime = 0L // Temps de la dernière duplication
+
     init {
         // L'initialisation se fera dans onSizeChanged
     }
@@ -159,11 +162,28 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         enemies.removeAll { it in enemiesToRemove }
         bullets.removeAll { it in bulletsToRemove }
 
+        // Duplication des ennemis
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastDuplicationTime > duplicationInterval) {
+            duplicateEnemies()
+            lastDuplicationTime = currentTime
+        }
+
         explosions.forEach { explosion ->
             explosion.forEach { it.update() }
         }
         explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
 
+    }
+
+    private fun duplicateEnemies() {
+        val enemiesToDuplicate = enemies.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
+
+        for (enemy in enemiesToDuplicate) {
+            val newEnemy = Enemy(enemy.x, enemy.y, enemy.width, enemy.height)
+            newEnemy.hitsToDestroy = enemy.hitsToDestroy  // Copie les points de vie
+            enemies.add(newEnemy)
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -192,7 +212,7 @@ class Player(var x: Float, var y: Float, val size: Float) {
         paint.color = when (lives) {
             3 -> Color.GREEN
             2 -> Color.rgb(255, 165, 0) // Orange
-            1 -> Color.rgb(255, 204, 204)
+            1 -> Color.rgb(252, 14, 14)
             else -> Color.TRANSPARENT
         }
 
@@ -242,7 +262,7 @@ class Enemy(var x: Float, var y: Float, val width: Float, val height: Float) {
 
     fun draw(canvas: Canvas, paint: Paint) {
         paint.color = when (hitsToDestroy) {
-            3 -> Color.rgb(255, 204, 204) // Rouge vif (255, 0, 0)
+            3 -> Color.rgb(252, 14, 14) // Rouge vif (255, 0, 0)
             2 -> Color.rgb(255, 165, 0) // Orange
             1 -> Color.WHITE
             else -> Color.TRANSPARENT
