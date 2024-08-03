@@ -17,7 +17,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private val numEnemyRows = 5
+    private val numEnemyRows = 4 // 5 ou 3 lignes
     private val numEnemyCols = 5
     private val enemyPadding = 10f
     private var enemyWidth = 0f
@@ -30,6 +30,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     private val duplicationInterval = 5000L // Intervalle de duplication en millisecondes (5 secondes)
     private var lastDuplicationTime = 0L // Temps de la dernière duplication
+
+    private var level = 1
 
     init {
         // L'initialisation se fera dans onSizeChanged
@@ -56,7 +58,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             for (col in 0 until numEnemyCols) {
                 val x = startX + col * (enemyWidth + enemyPadding)
                 val y = startY + row * (enemyHeight + enemyPadding)
-                enemies.add(Enemy(x, y, enemyWidth, enemyHeight))
+                enemies.add(Enemy(x, y, enemyWidth, enemyHeight, level))
             }
         }
     }
@@ -77,7 +79,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         invalidate()
     }
 
-    private fun createExplosion(x: Float, y: Float, width: Float, height: Float, color: Int) {
+    private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
+        val color = if (level == 1) Color.YELLOW else Color.BLUE
         val particleCount = 50
         val particles = List(particleCount) {
             ExplosionParticle(
@@ -101,7 +104,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 20f,
                 Random.nextFloat() * 20 - 10,
                 Random.nextFloat() * 20 - 10,
-                Color.RED
+                Color.YELLOW
             )
         }
         explosions.add(particles)
@@ -150,7 +153,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             for (bullet in bullets) {
                 if (bullet.intersects(enemy)) {
                     if (enemy.hit()) {
-                        createExplosion(enemy.x, enemy.y, enemy.width, enemy.height, Color.WHITE)
+                        createExplosion(enemy.x, enemy.y, enemy.width, enemy.height)
                         enemiesToRemove.add(enemy)
                     }
                     bulletsToRemove.add(bullet)
@@ -174,13 +177,36 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
         explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
 
+        if (enemies.isEmpty()) {
+            startNextLevel()
+        }
+
+    }
+
+    private fun startNextLevel() {
+        level++
+        speedMultiplier = 1f
+        enemiesDestroyed = 0
+
+        // Réinitialiser les ennemis
+        enemies.clear()
+        val startX = (screenWidth - (numEnemyCols * (enemyWidth + enemyPadding) - enemyPadding)) / 2
+        val startY = screenHeight / 4
+
+        for (row in 0 until numEnemyRows) {
+            for (col in 0 until numEnemyCols) {
+                val x = startX + col * (enemyWidth + enemyPadding)
+                val y = startY + row * (enemyHeight + enemyPadding)
+                enemies.add(Enemy(x, y, enemyWidth, enemyHeight, level))
+            }
+        }
     }
 
     private fun duplicateEnemies() {
         val enemiesToDuplicate = enemies.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
 
         for (enemy in enemiesToDuplicate) {
-            val newEnemy = Enemy(enemy.x, enemy.y, enemy.width, enemy.height)
+            val newEnemy = Enemy(enemy.x, enemy.y, enemy.width, enemy.height, level)
             newEnemy.hitsToDestroy = enemy.hitsToDestroy  // Copie les points de vie
             enemies.add(newEnemy)
         }
@@ -252,18 +278,24 @@ class Player(var x: Float, var y: Float, val size: Float) {
 
 }
 
-class Enemy(var x: Float, var y: Float, val width: Float, val height: Float) {
-    var hitsToDestroy = 3
+class Enemy(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
+    var hitsToDestroy = 3 + level
     private var dx = Random.nextFloat() * 8 - 4 // Vitesse horizontale aléatoire entre -4 et 4
     private var dy = Random.nextFloat() * 8 - 4 // Vitesse verticale aléatoire entre -4 et 4
 
     private var rotationAngle = 0f
     private var rotationSpeed = 2f // Ajustez la vitesse de rotation selon vos préférences
 
+    private val baseColor = when (level) {
+        1 -> Color.RED
+        else -> Color.BLUE
+    }
+
     fun draw(canvas: Canvas, paint: Paint) {
         paint.color = when (hitsToDestroy) {
-            3 -> Color.rgb(252, 14, 14) // Rouge vif (255, 0, 0)
-            2 -> Color.rgb(255, 165, 0) // Orange
+            4 -> Color.argb(255, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            3 -> Color.argb(200, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            2 -> Color.argb(150, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
             1 -> Color.WHITE
             else -> Color.TRANSPARENT
         }
@@ -307,10 +339,26 @@ class Enemy(var x: Float, var y: Float, val width: Float, val height: Float) {
 
         // Gestion de la sortie d'écran
         when {
-            x < -width -> x = screenWidth + Random.nextFloat() * screenWidth
-            x > screenWidth -> x = -width + Random.nextFloat() * screenWidth
-            y < -height -> y = screenHeight + Random.nextFloat() * screenHeight
-            y > screenHeight -> y = -height + Random.nextFloat() * screenHeight
+            x < -width -> {
+                // Réapparition par la droite
+                x = screenWidth
+                y = Random.nextFloat() * (screenHeight * 0.7f) // Limite à 70% de la hauteur de l'écran
+            }
+            x > screenWidth -> {
+                // Réapparition par la gauche
+                x = -width
+                y = Random.nextFloat() * (screenHeight * 0.7f) // Limite à 70% de la hauteur de l'écran
+            }
+            y < -height -> {
+                // Réapparition par le bas de l'écran
+                y = screenHeight * 0.7f // Réapparition à 70% de la hauteur de l'écran
+                x = Random.nextFloat() * screenWidth
+            }
+            y > screenHeight -> {
+                // Si l'ennemi sort par le bas, le faire réapparaître en haut
+                y = -height
+                x = Random.nextFloat() * screenWidth
+            }
         }
     }
 
