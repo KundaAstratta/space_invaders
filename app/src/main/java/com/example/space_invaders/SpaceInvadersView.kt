@@ -9,22 +9,23 @@ import kotlin.random.Random
 
 
 class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
+
     private lateinit var player: Player
-    private val enemies = mutableListOf<Enemy>()
+    private val cosmicHorrors = mutableListOf<CosmicHorror>()
     private val bullets = mutableListOf<Bullet>()
     private val paint = Paint()
 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private val numEnemyRows = 4 // 5 ou 3 lignes
-    private val numEnemyCols = 5
-    private val enemyPadding = 10f
-    private var enemyWidth = 0f
-    private var enemyHeight = 0f
+    private val numCosmicHorrorRows = 4 // 5 ou 3 lignes
+    private val numCosmicHorrorCols = 5
+    private val cosmicHorrorPadding = 10f
+    private var cosmicHorrorWidth = 0f
+    private var cosmicHorrorHeight = 0f
 
     private var speedMultiplier = 1f
-    private var enemiesDestroyed = 0
+    private var cosmicHorrorsDestroyed = 0
 
     private val explosions = mutableListOf<List<ExplosionParticle>>()
 
@@ -39,36 +40,39 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+
         screenWidth = w.toFloat()
         screenHeight = h.toFloat()
 
         // Calculer la taille des ennemis
-        enemyWidth = (screenWidth - (numEnemyCols + 1) * enemyPadding) / numEnemyCols
-        enemyHeight = enemyWidth / 2 // Ajustez le ratio selon vos préférences
+        cosmicHorrorWidth = (screenWidth - (numCosmicHorrorCols + 1) * cosmicHorrorPadding) / numCosmicHorrorCols
+        cosmicHorrorHeight = cosmicHorrorWidth / 2 // Ajustez le ratio selon vos préférences
 
         // Initialiser le joueur
         val playerSize = screenWidth / 10
         player = Player(screenWidth / 2, screenHeight - playerSize, playerSize)
 
         // Initialiser les ennemis
-        val startX = (screenWidth - (numEnemyCols * (enemyWidth + enemyPadding) - enemyPadding)) / 2
+        val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
         val startY = screenHeight / 4
 
-        for (row in 0 until numEnemyRows) {
-            for (col in 0 until numEnemyCols) {
-                val x = startX + col * (enemyWidth + enemyPadding)
-                val y = startY + row * (enemyHeight + enemyPadding)
-                enemies.add(Enemy(x, y, enemyWidth, enemyHeight, level))
+        for (row in 0 until numCosmicHorrorRows) {
+            for (col in 0 until numCosmicHorrorCols) {
+                val x = startX + col * (cosmicHorrorWidth + cosmicHorrorPadding)
+                val y = startY + row * (cosmicHorrorHeight + cosmicHorrorPadding)
+                cosmicHorrors.add(CosmicHorror(x, y, cosmicHorrorWidth, cosmicHorrorHeight, level))
             }
         }
+
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
         canvas.drawColor(Color.BLACK)
 
         player.draw(canvas, paint)
-        enemies.forEach { it.draw(canvas, paint) }
+        cosmicHorrors.forEach { it.draw(canvas, paint) }
         bullets.forEach { it.draw(canvas, paint) }
 
         explosions.forEach { explosion ->
@@ -80,16 +84,22 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
-        val color = if (level == 1) Color.YELLOW else Color.BLUE
+        val baseColor = Color.rgb(57, 255, 20)  // Vert phosphorescent de base
         val particleCount = 50
         val particles = List(particleCount) {
+            val colorVariation = Random.nextInt(-20, 21)
+            val particleColor = Color.rgb(
+                (Color.red(baseColor) + colorVariation).coerceIn(0, 255),
+                (Color.green(baseColor) + colorVariation).coerceIn(0, 255),
+                (Color.blue(baseColor) + colorVariation).coerceIn(0, 255)
+            )
             ExplosionParticle(
                 x + Random.nextFloat() * width,
                 y + Random.nextFloat() * height,
-                20f, // taille des particules
-                Random.nextFloat() * 10 - 5, // vitesse x aléatoire
-                Random.nextFloat() * 10 - 5 , // vitesse y aléatoire
-                color
+                20f,
+                Random.nextFloat() * 10 - 5,
+                Random.nextFloat() * 10 - 5,
+                particleColor
             )
         }
         explosions.add(particles)
@@ -120,41 +130,42 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun update() {
+
         bullets.forEach { it.move() }
         bullets.removeAll { it.y < 0 }
 
-        enemies.forEach { enemy ->
-            enemy.move(screenWidth, screenHeight, speedMultiplier)
-            enemy.changeDirection(speedMultiplier)
+        cosmicHorrors.forEach { cosmicHorror ->
+            cosmicHorror.move(screenWidth, screenHeight, speedMultiplier)
+            cosmicHorror.changeDirection(speedMultiplier)
         }
 
-        if (enemiesDestroyed > 0 && enemiesDestroyed % 5 == 0) {
+        if (cosmicHorrorsDestroyed > 0 && cosmicHorrorsDestroyed % 5 == 0) {
             speedMultiplier *= 1.1f // Augmentation de 10%
-            enemiesDestroyed++
+            cosmicHorrorsDestroyed++
         }
 
         val bulletsToRemove = mutableListOf<Bullet>()
-        val enemiesToRemove = mutableListOf<Enemy>()
+        val cosmicHorrorToRemove = mutableListOf<CosmicHorror>()
 
-        for (enemy in enemies) {
-            if (player.intersects(enemy)) {
+        for (cosmicHorror in cosmicHorrors) {
+            if (player.intersects(cosmicHorror)) {
                 if (player.hit()) {
                     createPlayerExplosion()
                     checkGameOver()
 
                     // Gérer la fin du jeu ici
                 }
-                enemies.remove(enemy)
+                cosmicHorrors.remove(cosmicHorror)
                 break
             }
         }
 
-        for (enemy in enemies) {
+        for (cosmicHorror in cosmicHorrors) {
             for (bullet in bullets) {
-                if (bullet.intersects(enemy)) {
-                    if (enemy.hit()) {
-                        createExplosion(enemy.x, enemy.y, enemy.width, enemy.height)
-                        enemiesToRemove.add(enemy)
+                if (bullet.intersects(cosmicHorror)) {
+                    if (cosmicHorror.hit()) {
+                        createExplosion(cosmicHorror.x, cosmicHorror.y, cosmicHorror.width, cosmicHorror.height)
+                        cosmicHorrorToRemove.add(cosmicHorror)
                     }
                     bulletsToRemove.add(bullet)
                     break
@@ -162,13 +173,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
 
-        enemies.removeAll { it in enemiesToRemove }
+        cosmicHorrors.removeAll { it in cosmicHorrorToRemove }
         bullets.removeAll { it in bulletsToRemove }
 
         // Duplication des ennemis
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastDuplicationTime > duplicationInterval) {
-            duplicateEnemies()
+            duplicateCosmicHorror()
             lastDuplicationTime = currentTime
         }
 
@@ -177,7 +188,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
         explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
 
-        if (enemies.isEmpty()) {
+        if (cosmicHorrors.isEmpty()) {
             startNextLevel()
         }
 
@@ -186,29 +197,29 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private fun startNextLevel() {
         level++
         speedMultiplier = 1f
-        enemiesDestroyed = 0
+        cosmicHorrorsDestroyed = 0
 
         // Réinitialiser les ennemis
-        enemies.clear()
-        val startX = (screenWidth - (numEnemyCols * (enemyWidth + enemyPadding) - enemyPadding)) / 2
+        cosmicHorrors.clear()
+        val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
         val startY = screenHeight / 4
 
-        for (row in 0 until numEnemyRows) {
-            for (col in 0 until numEnemyCols) {
-                val x = startX + col * (enemyWidth + enemyPadding)
-                val y = startY + row * (enemyHeight + enemyPadding)
-                enemies.add(Enemy(x, y, enemyWidth, enemyHeight, level))
+        for (row in 0 until numCosmicHorrorRows) {
+            for (col in 0 until numCosmicHorrorCols) {
+                val x = startX + col * (cosmicHorrorWidth + cosmicHorrorPadding)
+                val y = startY + row * (cosmicHorrorHeight + cosmicHorrorPadding)
+                cosmicHorrors.add(CosmicHorror(x, y, cosmicHorrorWidth, cosmicHorrorHeight, level))
             }
         }
     }
 
-    private fun duplicateEnemies() {
-        val enemiesToDuplicate = enemies.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
+    private fun duplicateCosmicHorror() {
+        val cosmicHorrorsToDuplicate = cosmicHorrors.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
 
-        for (enemy in enemiesToDuplicate) {
-            val newEnemy = Enemy(enemy.x, enemy.y, enemy.width, enemy.height, level)
-            newEnemy.hitsToDestroy = enemy.hitsToDestroy  // Copie les points de vie
-            enemies.add(newEnemy)
+        for (cosmicHorror in cosmicHorrorsToDuplicate) {
+            val newCosmicHorror = CosmicHorror(cosmicHorror.x, cosmicHorror.y, cosmicHorror.width, cosmicHorror.height, level)
+            newCosmicHorror.hitsToDestroy = cosmicHorror.hitsToDestroy  // Copie les points de vie
+            cosmicHorrors.add(newCosmicHorror)
         }
     }
 
@@ -220,34 +231,47 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         return true
     }
 
-
-    private fun removeEnemy(enemy: Enemy) {
-        enemies.remove(enemy)
-        enemiesDestroyed++
+    private fun removeCosmicHorror(cosmicHorror: CosmicHorror) {
+        cosmicHorrors.remove(cosmicHorror)
+        cosmicHorrorsDestroyed++
     }
-
-
 
 }
 
 class Player(var x: Float, var y: Float, val size: Float) {
     var lives = 3
+    private var auraRadius = size / 1.5f
+    private var auraGrowing = true
+    private var auraGrowthSpeed = 1f // Ajustez la vitesse de pulsation
 
     fun draw(canvas: Canvas, paint: Paint) {
+        when (lives) {
+            3 -> {
+                paint.color = Color.rgb(0, 255, 0)
+                 auraGrowthSpeed =1f
+            }// Vert pour 3 vies
+            2 -> {
+                paint.color = Color.rgb(255, 165, 0) // Orange pour 2 vies
+                auraGrowthSpeed =2f
+            }
+            1 -> {
+                paint.color = Color.rgb(255, 0, 0) // Rouge pour 1 vie
+                auraGrowthSpeed =3f
+            }
 
-        paint.color = when (lives) {
-            3 -> Color.GREEN
-            2 -> Color.rgb(255, 165, 0) // Orange
-            1 -> Color.rgb(252, 14, 14)
-            else -> Color.TRANSPARENT
+            else -> {
+                Color.TRANSPARENT
+            }
         }
 
-        //canvas.drawRect(x - size / 2, y - size / 2, x + size / 2, y + size / 2, paint)
         // Épaisseur du trait (ajustez la valeur selon vos préférences)
         paint.strokeWidth = 5f
 
-        // Calcul des coordonnées des sommets du triangle
-        val halfSize = size / 2
+        // Mise à jour de la taille du triangle
+        val currentSize = size * (1 + (auraRadius - size / 1.5f) / (size * 0.5f)) // Calcul d'un facteur d'échelle basé sur l'aura
+
+        // Calcul des coordonnées des sommets du triangle avec la nouvelle taille
+        val halfSize = currentSize / 2
         val topX = x
         val topY = y - halfSize
         val bottomLeftX = x - halfSize
@@ -259,6 +283,22 @@ class Player(var x: Float, var y: Float, val size: Float) {
         canvas.drawLine(topX, topY, bottomLeftX, bottomLeftY, paint)
         canvas.drawLine(bottomLeftX, bottomLeftY, bottomRightX, bottomRightY, paint)
         canvas.drawLine(bottomRightX, bottomRightY, topX, topY, paint)
+
+        // Mise à jour du rayon de l'aura
+        if (auraGrowing) {
+            auraRadius += auraGrowthSpeed
+            if (auraRadius > size) {
+                auraGrowing = false
+            }
+        } else {
+            auraRadius -= auraGrowthSpeed
+            if (auraRadius < size / 1.5f) {
+                auraGrowing = true
+            }
+        }
+
+        paint.style = Paint.Style.FILL // Rétablir le style de remplissage
+
     }
 
     fun moveTo(newX: Float) {
@@ -270,15 +310,15 @@ class Player(var x: Float, var y: Float, val size: Float) {
         return lives <= 0
     }
 
-    fun intersects(enemy: Enemy): Boolean {
-        return x + size / 2 > enemy.x && x - size / 2 < enemy.x + enemy.width &&
-                y + size / 2 > enemy.y && y - size / 2 < enemy.y + enemy.height
+    fun intersects(cosmicHorror: CosmicHorror): Boolean {
+        return x + size / 2 > cosmicHorror.x && x - size / 2 < cosmicHorror.x + cosmicHorror.width &&
+                y + size / 2 > cosmicHorror.y && y - size / 2 < cosmicHorror.y + cosmicHorror.height
     }
 
 
 }
 
-class Enemy(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
+class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
     var hitsToDestroy = 3 + level
     private var dx = Random.nextFloat() * 8 - 4 // Vitesse horizontale aléatoire entre -4 et 4
     private var dy = Random.nextFloat() * 8 - 4 // Vitesse verticale aléatoire entre -4 et 4
@@ -288,14 +328,16 @@ class Enemy(var x: Float, var y: Float, val width: Float, val height: Float, lev
 
     private val baseColor = when (level) {
         1 -> Color.RED
-        else -> Color.BLUE
+        2 -> Color.BLUE
+        else -> Color.rgb(128,0,128)
     }
 
     fun draw(canvas: Canvas, paint: Paint) {
         paint.color = when (hitsToDestroy) {
-            4 -> Color.argb(255, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            5 -> Color.argb(255, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            4 -> Color.argb(230, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
             3 -> Color.argb(200, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
-            2 -> Color.argb(150, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            2 -> Color.argb(170, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
             1 -> Color.WHITE
             else -> Color.TRANSPARENT
         }
@@ -371,21 +413,54 @@ class Enemy(var x: Float, var y: Float, val width: Float, val height: Float, lev
 }
 
 class Bullet(var x: Float, var y: Float) {
-    private val radius = 5f
-    private val speed = 10f
+    private val speed = 15f
+    private val boltLength = 150f
+    private val boltWidth = 5f
+    private val flickerSpeed = 5 // Contrôle la vitesse de scintillement
+
+    //private val baseColor = Color.rgb(128, 0, 255) // Violet de base pour l'énergie occulte
+    private  var baseColor = Color.YELLOW
+    private var currentColor = baseColor
+    private val random = Random
 
     fun draw(canvas: Canvas, paint: Paint) {
-        paint.color = Color.WHITE
-        canvas.drawCircle(x, y, radius, paint)
+        // Faire scintiller la couleur
+        if (random.nextInt(flickerSpeed) == 0) {
+            currentColor = getFlickeringColor()
+        }
+        paint.color = currentColor
+        paint.strokeWidth = boltWidth
+
+        // Dessiner le corps principal de l'éclair avec un zigzag
+        val zigzagWidth = 10f
+        var lastX = x
+        var lastY = y
+        for (i in 0..5) {
+            val newX = x + (if (i % 2 == 0) zigzagWidth else -zigzagWidth)
+            val newY = y - (i + 1) * boltLength / 6
+            canvas.drawLine(lastX, lastY, newX, newY, paint)
+            lastX = newX
+            lastY = newY
+        }
+
+    }
+
+    private fun getFlickeringColor(): Int {
+        val flickerIntensity = 50
+        return Color.rgb(
+            (Color.red(baseColor) + random.nextInt(-flickerIntensity, flickerIntensity + 1)).coerceIn(0, 255),
+            (Color.green(baseColor) + random.nextInt(-flickerIntensity, flickerIntensity + 1)).coerceIn(0, 255),
+            (Color.blue(baseColor) + random.nextInt(-flickerIntensity, flickerIntensity + 1)).coerceIn(0, 255)
+        )
     }
 
     fun move() {
         y -= speed
     }
 
-    fun intersects(enemy: Enemy): Boolean {
-        return x > enemy.x && x < enemy.x + enemy.width &&
-                y > enemy.y && y < enemy.y + enemy.height
+    fun intersects(cosmicHorror: CosmicHorror): Boolean {
+        return x > cosmicHorror.x && x < cosmicHorror.x + cosmicHorror.width &&
+                y > cosmicHorror.y && y < cosmicHorror.y + cosmicHorror.height
     }
 }
 
