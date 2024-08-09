@@ -2,9 +2,17 @@ package com.example.space_invaders
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 
@@ -12,6 +20,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     private lateinit var player: Player
     private val cosmicHorrors = mutableListOf<CosmicHorror>()
+    private var dhole: Dhole? = null
+    private val maxCosmicHorrorLevels = 3 // Définissez le nombre de niveaux CosmicHorror souhaités
     private val bullets = mutableListOf<Bullet>()
     private val paint = Paint()
 
@@ -33,6 +43,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var lastDuplicationTime = 0L // Temps de la dernière duplication
 
     private var level = 1
+
+
+    private var isPlayerTouched = false
+    private var touchOffsetX = 0f
+    private var touchOffsetY = 0f
 
     init {
         // L'initialisation se fera dans onSizeChanged
@@ -56,6 +71,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
         val startY = screenHeight / 4
 
+        //TEST NIVEAU DHOLE
+
         for (row in 0 until numCosmicHorrorRows) {
             for (col in 0 until numCosmicHorrorCols) {
                 val x = startX + col * (cosmicHorrorWidth + cosmicHorrorPadding)
@@ -64,6 +81,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
 
+        // TEST NIVEAU DHOLE
+        //createDhole()
+
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -71,9 +91,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         canvas.drawColor(Color.BLACK)
 
-        player.draw(canvas, paint)
+        if (player.isAlive) {
+            player.draw(canvas, paint)
+        }
         cosmicHorrors.forEach { it.draw(canvas, paint) }
         bullets.forEach { it.draw(canvas, paint) }
+        dhole?.draw(canvas, paint)
 
         explosions.forEach { explosion ->
             explosion.forEach { it.draw(canvas, paint) }
@@ -121,11 +144,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun checkGameOver() {
-        if (player.lives <= 0) {
+        if (!player.isAlive) {
             // Attendez un peu pour que l'explosion soit visible
+            createPlayerExplosion()
             postDelayed({
                 onGameOver()
-            }, 2000) // 2 secondes de délai
+            }, 1000) // x secondes de délai
         }
     }
 
@@ -152,8 +176,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 if (player.hit()) {
                     createPlayerExplosion()
                     checkGameOver()
-
-                    // Gérer la fin du jeu ici
                 }
                 cosmicHorrors.remove(cosmicHorror)
                 break
@@ -188,7 +210,33 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
         explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
 
-        if (cosmicHorrors.isEmpty()) {
+        dhole?.let { currentDhole ->
+            currentDhole.move(screenWidth, screenHeight)
+            if (currentDhole.intersectsPlayer(player)) {
+                if (player.hit()) {
+                    createPlayerExplosion()
+                    checkGameOver()
+                }
+                // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
+                currentDhole.setInvincibilityFrame()
+            }
+
+            val bulletsToRemove = mutableListOf<Bullet>()
+            bullets.forEach { bullet ->
+                if (currentDhole.hit(bullet.x, bullet.y)) {
+                    bulletsToRemove.add(bullet)
+                    if (currentDhole.isDestroyed()) {
+                        dhole = null
+                        // Le jeu se termine après avoir vaincu le Dhole
+                        postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
+                    }
+                }
+            }
+            bullets.removeAll(bulletsToRemove)
+
+        }
+
+        if (cosmicHorrors.isEmpty() && dhole == null) {
             startNextLevel()
         }
 
@@ -199,7 +247,18 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         speedMultiplier = 1f
         cosmicHorrorsDestroyed = 0
 
+        println("level" + level)
+
         // Réinitialiser les ennemis
+        if (level > maxCosmicHorrorLevels) {
+            // Niveau  : créer un Dhole
+            createDhole()
+        } else {
+            createCosmicHorrors()
+        }
+    }
+
+    private fun createCosmicHorrors() {
         cosmicHorrors.clear()
         val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
         val startY = screenHeight / 4
@@ -223,99 +282,157 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
+    private fun createDhole() {
+        dhole = Dhole(screenWidth / 2, screenHeight / 4, screenWidth / 10)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        val touchRadius = dpToPx(context, 200f) // rayon de controle autour du jour
+        if (!player.isAlive) return true // Ignorer les touches si le joueur est mort
         when (event.action) {
-            MotionEvent.ACTION_MOVE -> player.moveTo(event.x.coerceIn(0f, screenWidth))
-            MotionEvent.ACTION_DOWN -> bullets.add(Bullet(player.x, player.y - player.size / 2))
+            MotionEvent.ACTION_DOWN -> {
+                // Vérifier si le toucher commence près du joueur
+                val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
+                if (distanceToPlayer <= player.size / 2 + touchRadius) {
+                    isPlayerTouched = true
+                    touchOffsetX = player.x - event.x
+                    touchOffsetY = player.y - event.y
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                // Déplacer le joueur seulement si le toucher a commencé près de lui
+                if (isPlayerTouched) {
+                    player.moveTo(
+                        event.x + touchOffsetX,
+                        event.y + touchOffsetY,
+                        screenWidth,
+                        screenHeight
+                    )
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                if (isPlayerTouched) {
+                    // Tirer seulement si le toucher est relâché près du joueur
+                    val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
+                    if (distanceToPlayer <= player.size / 2 + touchRadius) {
+                        bullets.add(Bullet(player.x, player.y - player.size / 2))
+                    }
+                    isPlayerTouched = false
+                }
+            }
         }
         return true
     }
 
-    private fun removeCosmicHorror(cosmicHorror: CosmicHorror) {
-        cosmicHorrors.remove(cosmicHorror)
-        cosmicHorrorsDestroyed++
+    fun dpToPx(context: Context, dp: Float): Float {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp,
+            context.resources.displayMetrics
+        )
     }
 
 }
 
 class Player(var x: Float, var y: Float, val size: Float) {
     var lives = 3
-    private var auraRadius = size / 1.5f
-    private var auraGrowing = true
-    private var auraGrowthSpeed = 1f // Ajustez la vitesse de pulsation
+    var isAlive = true
+    private var rotation = 0f
+    private val rotationSpeed = 0.1f
+    private val textureSize = size / 4f
+    private var lastX = x
+    private val veins = mutableListOf<Vein>()
+    private val numVeins = 15
 
-    fun draw(canvas: Canvas, paint: Paint) {
-        when (lives) {
-            3 -> {
-                paint.color = Color.rgb(0, 255, 0)
-                 auraGrowthSpeed =1f
-            }// Vert pour 3 vies
-            2 -> {
-                paint.color = Color.rgb(255, 165, 0) // Orange pour 2 vies
-                auraGrowthSpeed =2f
-            }
-            1 -> {
-                paint.color = Color.rgb(255, 0, 0) // Rouge pour 1 vie
-                auraGrowthSpeed =3f
-            }
-
-            else -> {
-                Color.TRANSPARENT
-            }
-        }
-
-        // Épaisseur du trait (ajustez la valeur selon vos préférences)
-        paint.strokeWidth = 5f
-
-        // Mise à jour de la taille du triangle
-        val currentSize = size * (1 + (auraRadius - size / 1.5f) / (size * 0.5f)) // Calcul d'un facteur d'échelle basé sur l'aura
-
-        // Calcul des coordonnées des sommets du triangle avec la nouvelle taille
-        val halfSize = currentSize / 2
-        val topX = x
-        val topY = y - halfSize
-        val bottomLeftX = x - halfSize
-        val bottomLeftY = y + halfSize
-        val bottomRightX = x + halfSize
-        val bottomRightY = y + halfSize
-
-        // Dessin du triangle
-        canvas.drawLine(topX, topY, bottomLeftX, bottomLeftY, paint)
-        canvas.drawLine(bottomLeftX, bottomLeftY, bottomRightX, bottomRightY, paint)
-        canvas.drawLine(bottomRightX, bottomRightY, topX, topY, paint)
-
-        // Mise à jour du rayon de l'aura
-        if (auraGrowing) {
-            auraRadius += auraGrowthSpeed
-            if (auraRadius > size) {
-                auraGrowing = false
-            }
-        } else {
-            auraRadius -= auraGrowthSpeed
-            if (auraRadius < size / 1.5f) {
-                auraGrowing = true
-            }
-        }
-
-        paint.style = Paint.Style.FILL // Rétablir le style de remplissage
-
+    init {
+        generateVeins()
     }
 
-    fun moveTo(newX: Float) {
-        x = newX
+    private fun generateVeins() {
+        for (i in 0 until numVeins) {
+            veins.add(Vein(
+                Random.nextFloat() * 2 * PI.toFloat(),
+                Random.nextFloat() * (size / 2 - textureSize),
+                Random.nextFloat() * (size / 8) + size / 16,
+                Random.nextFloat() * 2 + 1
+            ))
+        }
+    }
+
+    data class Vein(
+        val angle: Float,
+        val distanceFromCenter: Float,
+        val length: Float,
+        val width: Float
+    )
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        // Couleur de la boule en fonction des vies restantes
+        val baseColor = when (lives) {
+            3 -> Color.rgb(0, 255, 255)  // Cyan
+            2 -> Color.rgb(255, 255, 0)  // Jaune
+            1 -> Color.rgb(255, 0, 255)  // Magenta
+            else -> Color.TRANSPARENT
+        }
+
+        // Dessiner la boule principale (l'oeil)
+        paint.color = Color.WHITE
+        canvas.drawCircle(x, y, size / 2, paint)
+
+        // Dessiner les veines
+        paint.color = Color.RED
+        for (vein in veins) {
+            val startX = x + cos(vein.angle) * vein.distanceFromCenter
+            val startY = y + sin(vein.angle) * vein.distanceFromCenter
+            val endX = startX + cos(vein.angle) * vein.length
+            val endY = startY + sin(vein.angle) * vein.length
+            paint.strokeWidth = vein.width
+            canvas.drawLine(startX, startY, endX, endY, paint)
+        }
+
+        // Dessiner la boule  (l'iris) AVANT la boule noire
+        paint.color = baseColor
+        val eyeRadius = textureSize / 2 + 10f // Légèrement plus grand que la boule noire
+        val eyeX = x + cos(rotation) * (size / 2 - eyeRadius)
+        val eyeY = y + sin(rotation) * (size / 2 - eyeRadius)
+        canvas.drawCircle(eyeX, eyeY, eyeRadius, paint)
+
+        // Dessiner la texture (petit cercle noir)
+        paint.color = Color.BLACK
+        val textureX = x + cos(rotation) * (size / 2 - textureSize / 2)
+        val textureY = y + sin(rotation) * (size / 2 - textureSize / 2)
+        canvas.drawCircle(textureX, textureY, textureSize / 2, paint)
+
+        // Mise à jour de la rotation seulement si la boule a bougé
+        val movement = x - lastX
+        if (abs(movement) > 0.1f) {  // Seuil pour éviter les micro-mouvements
+            rotation += movement * rotationSpeed
+            if (rotation > 2 * Math.PI) {
+                rotation -= 2 * Math.PI.toFloat()
+            } else if (rotation < 0) {
+                rotation += 2 * Math.PI.toFloat()
+            }
+        }
+        lastX = x
+    }
+
+    fun moveTo(newX: Float, newY: Float, screenWidth: Float, screenHeight: Float) {
+        x = newX.coerceIn(0f, screenWidth)
+        y = newY.coerceIn(size / 2, screenHeight - size / 2)
     }
 
     fun hit(): Boolean {
         lives--
-        return lives <= 0
+        if (lives <= 0) {
+            isAlive = false
+        }
+        return !isAlive
     }
 
     fun intersects(cosmicHorror: CosmicHorror): Boolean {
-        return x + size / 2 > cosmicHorror.x && x - size / 2 < cosmicHorror.x + cosmicHorror.width &&
-                y + size / 2 > cosmicHorror.y && y - size / 2 < cosmicHorror.y + cosmicHorror.height
+        val distance = kotlin.math.hypot(x - cosmicHorror.x - cosmicHorror.width / 2, y - cosmicHorror.y - cosmicHorror.height / 2)
+        return distance < size / 2 + kotlin.math.min(cosmicHorror.width, cosmicHorror.height) / 2
     }
-
-
 }
 
 class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
@@ -326,14 +443,21 @@ class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Flo
     private var rotationAngle = 0f
     private var rotationSpeed = 2f // Ajustez la vitesse de rotation selon vos préférences
 
+    private lateinit var gradient: LinearGradient
+
     private val baseColor = when (level) {
         1 -> Color.RED
         2 -> Color.BLUE
         else -> Color.rgb(128,0,128)
     }
 
-    fun draw(canvas: Canvas, paint: Paint) {
-        paint.color = when (hitsToDestroy) {
+    init {
+        // ... autre code d'initialisation ...
+        updateGradient()
+    }
+
+    private fun updateGradient() {
+        val startColor = when (hitsToDestroy) {
             5 -> Color.argb(255, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
             4 -> Color.argb(230, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
             3 -> Color.argb(200, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
@@ -341,37 +465,45 @@ class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Flo
             1 -> Color.WHITE
             else -> Color.TRANSPARENT
         }
+        val endColor = Color.argb(
+            Color.alpha(startColor),
+            (Color.red(startColor) * 0.7f).toInt(),
+            (Color.green(startColor) * 0.7f).toInt(),
+            (Color.blue(startColor) * 0.7f).toInt()
+        )
+        gradient = LinearGradient(
+            x, y, x + width, y + height,
+            startColor, endColor, Shader.TileMode.CLAMP
+        )
+    }
 
-        // Épaisseur du trait (ajustez la valeur selon vos préférences)
-        paint.strokeWidth = 5f
+    fun draw(canvas: Canvas, paint: Paint) {
+        updateGradient()
+        paint.shader = gradient
+        paint.style = Paint.Style.FILL
 
-        canvas.save() // Sauvegarder l'état du canvas
+        canvas.save()
 
-        // Rotation autour du centre du triangle
         canvas.rotate(rotationAngle, x + width / 2, y + height / 2)
 
-        // Calculer les coordonnées des sommets du triangle après rotation
-        val halfWidth = width / 2
-        val topX = x + halfWidth
-        val topY = y
-        val bottomLeftX = x
-        val bottomLeftY = y + height
-        val bottomRightX = x + width
-        val bottomRightY = y + height
+        val path = Path()
+        path.moveTo(x + width / 2, y)
+        path.lineTo(x, y + height)
+        path.lineTo(x + width, y + height)
+        path.close()
 
-        // Dessiner le triangle en utilisant drawLine()
-        canvas.drawLine(topX, topY, bottomLeftX, bottomLeftY, paint)
-        canvas.drawLine(bottomLeftX, bottomLeftY, bottomRightX, bottomRightY, paint)
-        canvas.drawLine(bottomRightX, bottomRightY, topX, topY, paint)
+        canvas.drawPath(path, paint)
 
-        canvas.restore() // Restaurer l'état du canvas
+        canvas.restore()
 
-        // Mise à jour de l'angle de rotation
         rotationAngle = (rotationAngle + rotationSpeed) % 360
+
+        paint.shader = null  // Réinitialiser le shader pour ne pas affecter d'autres dessins
     }
 
     fun hit(): Boolean {
         hitsToDestroy--
+        updateGradient()  // Mettre à jour le dégradé après chaque coup
         return hitsToDestroy <= 0
     }
 
@@ -409,6 +541,115 @@ class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Flo
             dx = (Random.nextFloat() * 8 - 4) * speedMultiplier
             dy = (Random.nextFloat() * 8 - 4) * speedMultiplier
         }
+    }
+}
+
+class Dhole(var x: Float, var y: Float, val circleSize: Float) {
+    private val numCircles = 15
+    private val circles = mutableListOf<DholeCircle>()
+    private var time = 0f
+    private var dx = Random.nextFloat() * 4 - 2 // Vitesse horizontale aléatoire
+    private var dy = Random.nextFloat() * 4 - 2 // Vitesse verticale aléatoire
+    private val maxSpeed = 5f
+    private val changeDirectionChance = 0.02f // 2% de chance de changer de direction à chaque frame
+    private var invincibilityFrames = 0
+
+    init {
+        for (i in 0 until numCircles) {
+            circles.add(DholeCircle(x, y + i * circleSize * 0.75f, circleSize))
+        }
+    }
+
+    fun setInvincibilityFrame() {
+        invincibilityFrames = 30 // Par exemple, 30 frames d'invincibilité (ajustez selon vos besoins)
+    }
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        circles.forEach { it.draw(canvas, paint) }
+    }
+
+    fun move(screenWidth: Float, screenHeight: Float) {
+        // Mise à jour de la position
+        x += dx
+        y += dy
+
+        if (invincibilityFrames > 0) {
+            invincibilityFrames--
+        }
+
+        // Changement de direction aléatoire
+        if (Random.nextFloat() < changeDirectionChance) {
+            dx = Random.nextFloat() * maxSpeed * 2 - maxSpeed
+            dy = Random.nextFloat() * maxSpeed * 2 - maxSpeed
+        }
+
+        // Gestion des bords de l'écran
+        if (x < 0 || x > screenWidth) dx = -dx
+        if (y < 0 || y > screenHeight / 2) dy = -dy // Limite à la moitié supérieure de l'écran
+
+        // Mise à jour du temps pour l'ondulation
+        time += 0.1f
+
+        // Mise à jour de la position des cercles avec ondulation
+        updateCirclePositions()
+    }
+
+    private fun updateCirclePositions() {
+        val waveAmplitude = circleSize * 2 // Amplitude de l'ondulation
+        val waveFrequency = 0.3f // Fréquence de l'ondulation
+
+        for (i in 0 until numCircles) {
+            val offsetX = waveAmplitude * sin((time + i * waveFrequency) * 2)
+            val offsetY = waveAmplitude * sin((time + i * waveFrequency) * 3) / 2
+
+            circles[i].x = x + offsetX
+            circles[i].y = y + i * circleSize * 0.75f + offsetY
+        }
+    }
+
+    fun hit(bulletX: Float, bulletY: Float): Boolean {
+        for (circle in circles) {
+            if (!circle.isDestroyed() && circle.hit(bulletX, bulletY)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun isDestroyed(): Boolean = circles.all { it.isDestroyed() }
+
+    fun intersectsPlayer(player: Player): Boolean {
+        return invincibilityFrames <= 0 && circles.any { it.intersectsPlayer(player) }
+    }
+
+}
+
+
+class DholeCircle(var x: Float, var y: Float, val size: Float) {
+    private var hits = 0
+    private val maxHits = 3
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        paint.color = when (hits) {
+            0 -> Color.rgb(128, 0, 128) // Violet foncé
+            1 -> Color.rgb(160, 32, 240) // Violet moyen
+            else -> Color.rgb(192, 64, 255) // Violet clair
+        }
+        canvas.drawCircle(x, y, size / 2, paint)
+    }
+
+    fun hit(bulletX: Float, bulletY: Float): Boolean {
+        if (hits < maxHits && kotlin.math.hypot(x - bulletX, y - bulletY) <= size / 2) {
+            hits++
+            return true
+        }
+        return false
+    }
+
+    fun isDestroyed(): Boolean = hits >= maxHits
+
+    fun intersectsPlayer(player: Player): Boolean {
+        return kotlin.math.hypot(x - player.x, y - player.y) <= (size / 2 + player.size / 2)
     }
 }
 
@@ -478,7 +719,7 @@ class ExplosionParticle(
     fun update(): Boolean {
         x += dx
         y += dy
-        alpha -= 2  // Réduisez cette valeur pour une disparition plus lente
+        alpha -= 5  // Réduisez cette valeur pour une disparition plus lente
         return alpha > 0
     }
 
