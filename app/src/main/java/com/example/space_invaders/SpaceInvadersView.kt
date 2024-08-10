@@ -317,7 +317,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                         event.x + touchOffsetX,
                         event.y + touchOffsetY,
                         screenWidth,
-                        screenHeight
+                        screenHeight,
+                        background.structures // Passez les structures ici
                     )
                 }
             }
@@ -427,9 +428,25 @@ class Player(var x: Float, var y: Float, val size: Float) {
         lastX = x
     }
 
-    fun moveTo(newX: Float, newY: Float, screenWidth: Float, screenHeight: Float) {
-        x = newX.coerceIn(0f, screenWidth)
-        y = newY.coerceIn(size / 2, screenHeight - size / 2)
+    fun moveTo(newX: Float, newY: Float, screenWidth: Float, screenHeight: Float, structures: List<Background.Structure>) {
+        //x = newX.coerceIn(0f, screenWidth)
+        //y = newY.coerceIn(size / 2, screenHeight - size / 2)
+
+        val potentialX = newX.coerceIn(size / 2, screenWidth - size / 2)
+        val potentialY = newY.coerceIn(size / 2, screenHeight - size / 2)
+
+        var canMove = true
+        for (structure in structures) {
+            if (structure.intersects(potentialX, potentialY, size)) {
+                canMove = false
+                break
+            }
+        }
+
+        if (canMove) {
+            x = potentialX
+            y = potentialY
+        }
     }
 
     fun hit(): Boolean {
@@ -744,7 +761,7 @@ class ExplosionParticle(
 
 class Background(private val screenWidth: Float, private val screenHeight: Float) {
     private val paint = Paint()
-    private val structures = mutableListOf<Structure>()
+    val structures = mutableListOf<Structure>()
     private var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
 
     enum class BackgroundType {
@@ -852,6 +869,11 @@ class Background(private val screenWidth: Float, private val screenHeight: Float
                 val brickX = x + i * brickWidth + (i - 1) * spacing
                 canvas.drawLine(brickX, y, brickX, y + height, paint)
             }
+        }
+
+        fun intersects(playerX: Float, playerY: Float, playerSize: Float): Boolean {
+            return playerX + playerSize / 2 > x && playerX - playerSize / 2 < x + width &&
+                    playerY + playerSize / 2 > y && playerY - playerSize / 2 < y + height
         }
     }
 }
