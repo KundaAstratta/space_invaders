@@ -49,6 +49,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var touchOffsetX = 0f
     private var touchOffsetY = 0f
 
+    // Créer un objet Background
+    private lateinit var background: Background
+
     init {
         // L'initialisation se fera dans onSizeChanged
     }
@@ -66,6 +69,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Initialiser le joueur
         val playerSize = screenWidth / 10
         player = Player(screenWidth / 2, screenHeight - playerSize, playerSize)
+
+        // Initialiser le fond d'écran
+        background = Background(screenWidth, screenHeight)
 
         // Initialiser les ennemis
         val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
@@ -89,7 +95,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        canvas.drawColor(Color.BLACK)
+        //canvas.drawColor(Color.BLACK)
+
+        // Dessiner le fond d'écran en premier
+        background.draw(canvas)
 
         if (player.isAlive) {
             player.draw(canvas, paint)
@@ -247,14 +256,16 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         speedMultiplier = 1f
         cosmicHorrorsDestroyed = 0
 
-        println("level" + level)
-
-        // Réinitialiser les ennemis
-        if (level > maxCosmicHorrorLevels) {
-            // Niveau  : créer un Dhole
-            createDhole()
-        } else {
-            createCosmicHorrors()
+        when {
+            level <= maxCosmicHorrorLevels -> {
+                createCosmicHorrors()
+                background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
+            }
+            //level == maxCosmicHorrorLevels + 1 -> {
+            else -> {
+                createDhole()
+                background.switchBackground(Background.BackgroundType.DHOLE_REALM)
+            }
         }
     }
 
@@ -729,4 +740,118 @@ class ExplosionParticle(
     }
 
     fun isAlive(): Boolean = alpha > 0
+}
+
+class Background(private val screenWidth: Float, private val screenHeight: Float) {
+    private val paint = Paint()
+    private val structures = mutableListOf<Structure>()
+    private var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
+
+    enum class BackgroundType {
+        COSMIC_HORROR_RUINS,
+        DHOLE_REALM
+        // Ajoutez d'autres types de fond ici au besoin
+    }
+
+    init {
+        generateStructures()
+    }
+
+    private fun generateStructures() {
+        structures.clear()
+        when (backgroundType) {
+            BackgroundType.COSMIC_HORROR_RUINS -> generateCosmicHorrorRuins()
+            BackgroundType.DHOLE_REALM -> generateDholeRealm()
+        }
+    }
+
+    private fun generateCosmicHorrorRuins() {
+        for (i in 0..10) {
+            structures.add(
+                Structure(
+                    Random.nextFloat() * screenWidth,
+                    Random.nextFloat() * screenHeight,
+                    Random.nextFloat() * 100 + 50,
+                    Random.nextFloat() * 200 + 100
+                )
+            )
+        }
+    }
+
+    private fun generateDholeRealm() {
+        // Implémentez la génération du décor pour le royaume des Dholes
+    }
+
+    private fun generateElderGodsDomain() {
+        // Implémentez la génération du décor pour le domaine des Dieux Anciens
+    }
+
+    private fun generateDreamlands() {
+        // Implémentez la génération du décor pour les Contrées du Rêve
+    }
+
+    fun draw(canvas: Canvas) {
+        when (backgroundType) {
+            BackgroundType.COSMIC_HORROR_RUINS -> drawCosmicHorrorRuins(canvas)
+            BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
+        }
+    }
+
+    private fun drawCosmicHorrorRuins(canvas: Canvas) {
+        canvas.drawColor(Color.BLACK)
+        drawStars(canvas)
+        paint.color = Color.GRAY
+        for (structure in structures) {
+            structure.draw(canvas, paint)
+        }
+    }
+
+    private fun drawDholeRealm(canvas: Canvas) {
+        // Implémentez le dessin du royaume des Dholes
+        drawStars(canvas)
+    }
+
+    private fun drawStars(canvas: Canvas) {
+        paint.color = Color.WHITE
+        for (i in 0..200) {
+            val x = Random.nextFloat() * screenWidth
+            val y = Random.nextFloat() * screenHeight
+            canvas.drawCircle(x, y, 5f, paint)
+        }
+    }
+
+    fun switchBackground(newType: BackgroundType) {
+        backgroundType = newType
+        generateStructures()
+    }
+
+    inner class Structure(private val x: Float, private val y: Float, private val width: Float, private val height: Float) {
+        fun draw(canvas: Canvas, paint: Paint) {
+            // Dessiner une structure alien simple
+            paint.color = Color.DKGRAY
+            canvas.drawRect(x, y, x + width, y + height, paint)
+            //canvas.drawLine(x, y, x + width / 2, y - height / 4, paint)
+            //canvas.drawLine(x + width, y, x + width / 2, y - height / 4, paint)
+            // Dessiner les traits blancs pour simuler les briques
+            paint.color = Color.WHITE
+            paint.strokeWidth = 2f // Épaisseur des traits (ajustez selon vos besoins)
+
+            // Calculer la taille des briques et l'espacement
+            val brickWidth = width / 5 // 5 briques en largeur
+            val brickHeight = height / 3 // 3 briques en hauteur
+            val spacing = 2f // Espacement entre les briques
+
+            // Dessiner les lignes horizontales
+            for (i in 1..2) { // 2 lignes horizontales
+                val brickY = y + i * brickHeight + (i - 1) * spacing
+                canvas.drawLine(x, brickY, x + width, brickY, paint)
+            }
+
+            // Dessiner les lignes verticales
+            for (i in 1..4) { // 4 lignes verticales
+                val brickX = x + i * brickWidth + (i - 1) * spacing
+                canvas.drawLine(brickX, y, brickX, y + height, paint)
+            }
+        }
+    }
 }
