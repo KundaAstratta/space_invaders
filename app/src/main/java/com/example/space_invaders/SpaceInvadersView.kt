@@ -118,37 +118,34 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
-        val baseColor = Color.rgb(57, 255, 20)  // Vert phosphorescent de base
-        val particleCount = 50
-        val particles = List(particleCount) {
-            val colorVariation = Random.nextInt(-20, 21)
-            val particleColor = Color.rgb(
-                (Color.red(baseColor) + colorVariation).coerceIn(0, 255),
-                (Color.green(baseColor) + colorVariation).coerceIn(0, 255),
-                (Color.blue(baseColor) + colorVariation).coerceIn(0, 255)
-            )
+        val baseColor = Color.rgb(57, 255, 20)  // Green color for the ripple effect
+        val maxRipples = 10  // Number of ripple effects
+
+        val particles = List(maxRipples) {
             ExplosionParticle(
                 x + Random.nextFloat() * width,
                 y + Random.nextFloat() * height,
-                20f,
-                Random.nextFloat() * 10 - 5,
-                Random.nextFloat() * 10 - 5,
-                particleColor
+                initialSize = 10f,  // Start small
+                maxSize = 150f,  // Max size for the ripple
+                growthRate = Random.nextFloat() * 5 + 2,  // Random growth rate
+                color = baseColor
             )
         }
         explosions.add(particles)
     }
 
     private fun createPlayerExplosion() {
-        val particleCount = 50
-        val particles = List(particleCount) {
+        val rippleCount = 5  // Number of ripples
+        val baseColor = Color.YELLOW  // Color for the player's explosion ripples
+
+        val particles = List(rippleCount) {
             ExplosionParticle(
-                player.x + Random.nextFloat() * player.size - player.size / 2,
-                player.y + Random.nextFloat() * player.size - player.size / 2,
-                20f,
-                Random.nextFloat() * 20 - 10,
-                Random.nextFloat() * 20 - 10,
-                Color.YELLOW
+                player.x,
+                player.y,
+                initialSize = 20f,  // Start small
+                maxSize = 200f,  // Max size for the ripple
+                growthRate = Random.nextFloat() * 5 + 2,  // Random growth rate
+                color = baseColor
             )
         }
         explosions.add(particles)
@@ -545,36 +542,7 @@ class Byakhee(var x: Float, var y: Float, val width: Float, val height: Float, l
         updateGradient()  // Mettre à jour le dégradé après chaque coup
         return hitsToDestroy <= 0
     }
-/*
-    fun move(screenWidth: Float, screenHeight: Float, speedMultiplier: Float) {
-        x += dx * speedMultiplier
-        y += dy * speedMultiplier
 
-        // Gestion de la sortie d'écran
-        when {
-            x < -width -> {
-                // Réapparition par la droite
-                x = screenWidth
-                y = Random.nextFloat() * (screenHeight * 0.7f) // Limite à 70% de la hauteur de l'écran
-            }
-            x > screenWidth -> {
-                // Réapparition par la gauche
-                x = -width
-                y = Random.nextFloat() * (screenHeight * 0.7f) // Limite à 70% de la hauteur de l'écran
-            }
-            y < -height -> {
-                // Réapparition par le bas de l'écran
-                y = screenHeight * 0.7f // Réapparition à 70% de la hauteur de l'écran
-                x = Random.nextFloat() * screenWidth
-            }
-            y > screenHeight -> {
-                // Si l'ennemi sort par le bas, le faire réapparaître en haut
-                y = -height
-                x = Random.nextFloat() * screenWidth
-            }
-        }
-    }
-*/
 fun move(screenWidth: Float, screenHeight: Float, speedMultiplier: Float, structures: List<Background.Structure>) {
     val newX = x + dx * speedMultiplier
     val newY = y + dy * speedMultiplier
@@ -777,29 +745,35 @@ class Bullet(var x: Float, var y: Float) {
 }
 
 class ExplosionParticle(
-    var x: Float,
-    var y: Float,
-    private val size: Float,
-    private val dx: Float,
-    private val dy: Float,
+    private var x: Float,
+    private var y: Float,
+    private var initialSize: Float,
+    private var maxSize: Float,
+    private val growthRate: Float,
     private val color: Int
-
 ) {
-    var alpha = 255
+    private var currentSize = initialSize
+    private var alpha = 255
 
     fun update(): Boolean {
-        x += dx
-        y += dy
-        alpha -= 5  // Réduisez cette valeur pour une disparition plus lente
-        return alpha > 0
+        currentSize += growthRate
+        alpha -= 5
+
+        return currentSize < maxSize && alpha > 0
     }
 
     fun draw(canvas: Canvas, paint: Paint) {
         paint.color = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
-        canvas.drawRect(x - size/2, y - size/2, x + size/2, y + size/2, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 5f
+
+        canvas.drawCircle(x, y, currentSize / 2, paint)
+
+        // Reset paint properties
+        paint.reset()
     }
 
-    fun isAlive(): Boolean = alpha > 0
+    fun isAlive(): Boolean = currentSize < maxSize && alpha > 0
 }
 
 class Background(private val context: Context, private val screenWidth: Float, private val screenHeight: Float) {
