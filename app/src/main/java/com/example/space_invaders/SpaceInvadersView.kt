@@ -1,5 +1,7 @@
 package com.example.space_invaders
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -19,23 +21,23 @@ import kotlin.random.Random
 class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
 
     private lateinit var player: Player
-    private val cosmicHorrors = mutableListOf<CosmicHorror>()
+    private val byakhees = mutableListOf<Byakhee>()
     private var dhole: Dhole? = null
-    private val maxCosmicHorrorLevels = 3 // Définissez le nombre de niveaux CosmicHorror souhaités
+    private val maxByakheeLevels = 3 // Définissez le nombre de niveaux Byakhee souhaités
     private val bullets = mutableListOf<Bullet>()
     private val paint = Paint()
 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private val numCosmicHorrorRows = 4 // 5 ou 3 lignes
-    private val numCosmicHorrorCols = 5
-    private val cosmicHorrorPadding = 10f
-    private var cosmicHorrorWidth = 0f
-    private var cosmicHorrorHeight = 0f
+    private val numByakheeRows = 4 // 5 ou 3 lignes
+    private val numByakheeCols = 5
+    private val byakheePadding = 10f
+    private var byakheeWidth = 0f
+    private var byakheeHeight = 0f
 
     private var speedMultiplier = 1f
-    private var cosmicHorrorsDestroyed = 0
+    private var byakheesDestroyed = 0
 
     private val explosions = mutableListOf<List<ExplosionParticle>>()
 
@@ -63,27 +65,27 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         screenHeight = h.toFloat()
 
         // Calculer la taille des ennemis
-        cosmicHorrorWidth = (screenWidth - (numCosmicHorrorCols + 1) * cosmicHorrorPadding) / numCosmicHorrorCols
-        cosmicHorrorHeight = cosmicHorrorWidth / 2 // Ajustez le ratio selon vos préférences
+        byakheeWidth = (screenWidth - (numByakheeCols + 1) * byakheePadding) / numByakheeCols
+        byakheeHeight = byakheeWidth / 2 // Ajustez le ratio selon vos préférences
 
         // Initialiser le joueur
         val playerSize = screenWidth / 10
         player = Player(screenWidth / 2, screenHeight - playerSize, playerSize)
 
         // Initialiser le fond d'écran
-        background = Background(screenWidth, screenHeight)
+        background = Background(context,screenWidth, screenHeight)
 
         // Initialiser les ennemis
-        val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
+        val startX = (screenWidth - (numByakheeCols * (byakheeWidth + byakheePadding) - byakheePadding)) / 2
         val startY = screenHeight / 4
 
         //TEST NIVEAU DHOLE
 
-        for (row in 0 until numCosmicHorrorRows) {
-            for (col in 0 until numCosmicHorrorCols) {
-                val x = startX + col * (cosmicHorrorWidth + cosmicHorrorPadding)
-                val y = startY + row * (cosmicHorrorHeight + cosmicHorrorPadding)
-                cosmicHorrors.add(CosmicHorror(x, y, cosmicHorrorWidth, cosmicHorrorHeight, level))
+        for (row in 0 until numByakheeRows) {
+            for (col in 0 until numByakheeCols) {
+                val x = startX + col * (byakheeWidth + byakheePadding)
+                val y = startY + row * (byakheeHeight + byakheePadding)
+                byakhees.add(Byakhee(x, y, byakheeWidth, byakheeHeight, level))
             }
         }
 
@@ -103,7 +105,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         if (player.isAlive) {
             player.draw(canvas, paint)
         }
-        cosmicHorrors.forEach { it.draw(canvas, paint) }
+        byakhees.forEach { it.draw(canvas, paint) }
         bullets.forEach { it.draw(canvas, paint) }
         dhole?.draw(canvas, paint)
 
@@ -165,38 +167,47 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private fun update() {
 
         bullets.forEach { it.move() }
+
+        // Vérifier les collisions des balles avec les structures
+        val bulletsToDesrtoy= bullets.filter { bullet ->
+            background.structures.any { structure ->
+                structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.width, bullet.height)
+            }
+        }
+        bullets.removeAll(bulletsToDesrtoy)
+
         bullets.removeAll { it.y < 0 }
 
-        cosmicHorrors.forEach { cosmicHorror ->
-            cosmicHorror.move(screenWidth, screenHeight, speedMultiplier)
-            cosmicHorror.changeDirection(speedMultiplier)
+        byakhees.forEach { byakhee ->
+            byakhee.move(screenWidth, screenHeight, speedMultiplier, background.structures)
+            byakhee.changeDirection(speedMultiplier)
         }
 
-        if (cosmicHorrorsDestroyed > 0 && cosmicHorrorsDestroyed % 5 == 0) {
+        if (byakheesDestroyed > 0 && byakheesDestroyed % 5 == 0) {
             speedMultiplier *= 1.1f // Augmentation de 10%
-            cosmicHorrorsDestroyed++
+            byakheesDestroyed++
         }
 
         val bulletsToRemove = mutableListOf<Bullet>()
-        val cosmicHorrorToRemove = mutableListOf<CosmicHorror>()
+        val byakheeToRemove = mutableListOf<Byakhee>()
 
-        for (cosmicHorror in cosmicHorrors) {
-            if (player.intersects(cosmicHorror)) {
+        for (byakhee in byakhees) {
+            if (player.intersects(byakhee)) {
                 if (player.hit()) {
                     createPlayerExplosion()
                     checkGameOver()
                 }
-                cosmicHorrors.remove(cosmicHorror)
+                byakhees.remove(byakhee)
                 break
             }
         }
 
-        for (cosmicHorror in cosmicHorrors) {
+        for (byakhee in byakhees) {
             for (bullet in bullets) {
-                if (bullet.intersects(cosmicHorror)) {
-                    if (cosmicHorror.hit()) {
-                        createExplosion(cosmicHorror.x, cosmicHorror.y, cosmicHorror.width, cosmicHorror.height)
-                        cosmicHorrorToRemove.add(cosmicHorror)
+                if (bullet.intersects(byakhee)) {
+                    if (byakhee.hit()) {
+                        createExplosion(byakhee.x, byakhee.y, byakhee.width, byakhee.height)
+                        byakheeToRemove.add(byakhee)
                     }
                     bulletsToRemove.add(bullet)
                     break
@@ -204,13 +215,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
 
-        cosmicHorrors.removeAll { it in cosmicHorrorToRemove }
+        byakhees.removeAll { it in byakheeToRemove }
         bullets.removeAll { it in bulletsToRemove }
 
         // Duplication des ennemis
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastDuplicationTime > duplicationInterval) {
-            duplicateCosmicHorror()
+            duplicateByakhee()
             lastDuplicationTime = currentTime
         }
 
@@ -245,7 +256,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         }
 
-        if (cosmicHorrors.isEmpty() && dhole == null) {
+        if (byakhees.isEmpty() && dhole == null) {
             startNextLevel()
         }
 
@@ -254,14 +265,14 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private fun startNextLevel() {
         level++
         speedMultiplier = 1f
-        cosmicHorrorsDestroyed = 0
+        byakheesDestroyed = 0
 
         when {
-            level <= maxCosmicHorrorLevels -> {
-                createCosmicHorrors()
+            level <= maxByakheeLevels -> {
+                createByakhees()
                 background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
             }
-            //level == maxCosmicHorrorLevels + 1 -> {
+            //level == maxByakheeLevels + 1 -> {
             else -> {
                 createDhole()
                 background.switchBackground(Background.BackgroundType.DHOLE_REALM)
@@ -269,27 +280,27 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
-    private fun createCosmicHorrors() {
-        cosmicHorrors.clear()
-        val startX = (screenWidth - (numCosmicHorrorCols * (cosmicHorrorWidth + cosmicHorrorPadding) - cosmicHorrorPadding)) / 2
+    private fun createByakhees() {
+        byakhees.clear()
+        val startX = (screenWidth - (numByakheeCols * (byakheeWidth + byakheePadding) - byakheePadding)) / 2
         val startY = screenHeight / 4
 
-        for (row in 0 until numCosmicHorrorRows) {
-            for (col in 0 until numCosmicHorrorCols) {
-                val x = startX + col * (cosmicHorrorWidth + cosmicHorrorPadding)
-                val y = startY + row * (cosmicHorrorHeight + cosmicHorrorPadding)
-                cosmicHorrors.add(CosmicHorror(x, y, cosmicHorrorWidth, cosmicHorrorHeight, level))
+        for (row in 0 until numByakheeRows) {
+            for (col in 0 until numByakheeCols) {
+                val x = startX + col * (byakheeWidth + byakheePadding)
+                val y = startY + row * (byakheeHeight + byakheePadding)
+                byakhees.add(Byakhee(x, y, byakheeWidth, byakheeHeight, level))
             }
         }
     }
 
-    private fun duplicateCosmicHorror() {
-        val cosmicHorrorsToDuplicate = cosmicHorrors.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
+    private fun duplicateByakhee() {
+        val byakheesToDuplicate = byakhees.filter { Random.nextFloat() < 0.2f } // 20% de chance de duplication pour chaque ennemi
 
-        for (cosmicHorror in cosmicHorrorsToDuplicate) {
-            val newCosmicHorror = CosmicHorror(cosmicHorror.x, cosmicHorror.y, cosmicHorror.width, cosmicHorror.height, level)
-            newCosmicHorror.hitsToDestroy = cosmicHorror.hitsToDestroy  // Copie les points de vie
-            cosmicHorrors.add(newCosmicHorror)
+        for (byakhee in byakheesToDuplicate) {
+            val newByakhee = Byakhee(byakhee.x, byakhee.y, byakhee.width, byakhee.height, level)
+            newByakhee.hitsToDestroy = byakhee.hitsToDestroy  // Copie les points de vie
+            byakhees.add(newByakhee)
         }
     }
 
@@ -457,13 +468,13 @@ class Player(var x: Float, var y: Float, val size: Float) {
         return !isAlive
     }
 
-    fun intersects(cosmicHorror: CosmicHorror): Boolean {
-        val distance = kotlin.math.hypot(x - cosmicHorror.x - cosmicHorror.width / 2, y - cosmicHorror.y - cosmicHorror.height / 2)
-        return distance < size / 2 + kotlin.math.min(cosmicHorror.width, cosmicHorror.height) / 2
+    fun intersects(byakhee: Byakhee): Boolean {
+        val distance = kotlin.math.hypot(x - byakhee.x - byakhee.width / 2, y - byakhee.y - byakhee.height / 2)
+        return distance < size / 2 + kotlin.math.min(byakhee.width, byakhee.height) / 2
     }
 }
 
-class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
+class Byakhee(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
     var hitsToDestroy = 3 + level
     private var dx = Random.nextFloat() * 8 - 4 // Vitesse horizontale aléatoire entre -4 et 4
     private var dy = Random.nextFloat() * 8 - 4 // Vitesse verticale aléatoire entre -4 et 4
@@ -534,7 +545,7 @@ class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Flo
         updateGradient()  // Mettre à jour le dégradé après chaque coup
         return hitsToDestroy <= 0
     }
-
+/*
     fun move(screenWidth: Float, screenHeight: Float, speedMultiplier: Float) {
         x += dx * speedMultiplier
         y += dy * speedMultiplier
@@ -563,7 +574,34 @@ class CosmicHorror(var x: Float, var y: Float, val width: Float, val height: Flo
             }
         }
     }
+*/
+fun move(screenWidth: Float, screenHeight: Float, speedMultiplier: Float, structures: List<Background.Structure>) {
+    val newX = x + dx * speedMultiplier
+    val newY = y + dy * speedMultiplier
 
+    x = newX
+    y = newY
+
+    // Gestion de la sortie d'écran
+    when {
+        x < -width -> {
+            x = screenWidth
+            y = Random.nextFloat() * (screenHeight * 0.7f)
+        }
+        x > screenWidth -> {
+            x = -width
+            y = Random.nextFloat() * (screenHeight * 0.7f)
+        }
+        y < -height -> {
+            y = screenHeight * 0.7f
+            x = Random.nextFloat() * screenWidth
+        }
+        y > screenHeight -> {
+            y = -height
+            x = Random.nextFloat() * screenWidth
+        }
+    }
+}
     fun changeDirection(speedMultiplier: Float) {
         if (Random.nextFloat() < 0.02) { // 2% de chance de changer de direction à chaque frame
             dx = (Random.nextFloat() * 8 - 4) * speedMultiplier
@@ -682,6 +720,8 @@ class DholeCircle(var x: Float, var y: Float, val size: Float) {
 }
 
 class Bullet(var x: Float, var y: Float) {
+    val width = 5f  // Largeur de la balle
+    val height = 15f  // Hauteur de la balle
     private val speed = 15f
     private val boltLength = 150f
     private val boltWidth = 5f
@@ -691,6 +731,7 @@ class Bullet(var x: Float, var y: Float) {
     private  var baseColor = Color.YELLOW
     private var currentColor = baseColor
     private val random = Random
+
 
     fun draw(canvas: Canvas, paint: Paint) {
         // Faire scintiller la couleur
@@ -727,9 +768,11 @@ class Bullet(var x: Float, var y: Float) {
         y -= speed
     }
 
-    fun intersects(cosmicHorror: CosmicHorror): Boolean {
-        return x > cosmicHorror.x && x < cosmicHorror.x + cosmicHorror.width &&
-                y > cosmicHorror.y && y < cosmicHorror.y + cosmicHorror.height
+    fun intersects(byakhee: Byakhee): Boolean {
+        return x < byakhee.x + byakhee.width &&
+                x + width > byakhee.x &&
+                y < byakhee.y + byakhee.height &&
+                y + height > byakhee.y
     }
 }
 
@@ -759,10 +802,11 @@ class ExplosionParticle(
     fun isAlive(): Boolean = alpha > 0
 }
 
-class Background(private val screenWidth: Float, private val screenHeight: Float) {
+class Background(private val context: Context, private val screenWidth: Float, private val screenHeight: Float) {
     private val paint = Paint()
     val structures = mutableListOf<Structure>()
     private var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
+    private var backgroundBitmap: Bitmap? = null
 
     enum class BackgroundType {
         COSMIC_HORROR_RUINS,
@@ -771,18 +815,56 @@ class Background(private val screenWidth: Float, private val screenHeight: Float
     }
 
     init {
+        loadBackgroundImage()
         generateStructures()
+    }
+
+    private fun loadBackgroundImage() {
+        val resourceId = when (backgroundType) {
+            BackgroundType.COSMIC_HORROR_RUINS -> R.drawable.byakhee_horror_background
+            BackgroundType.DHOLE_REALM -> R.drawable.dhole_realm_background
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeResource(context.resources, resourceId, options)
+
+        val sampleSize = calculateInSampleSize(options, screenWidth.toInt(), screenHeight.toInt())
+        options.apply {
+            inJustDecodeBounds = false
+            inSampleSize = sampleSize
+        }
+
+        backgroundBitmap = BitmapFactory.decodeResource(context.resources, resourceId, options)
+        backgroundBitmap = Bitmap.createScaledBitmap(backgroundBitmap!!, screenWidth.toInt(), screenHeight.toInt(), true)
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize
     }
 
     private fun generateStructures() {
         structures.clear()
         when (backgroundType) {
-            BackgroundType.COSMIC_HORROR_RUINS -> generateCosmicHorrorRuins()
+            BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins()
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
         }
     }
 
-    private fun generateCosmicHorrorRuins() {
+    private fun generateByakheeRuins() {
         for (i in 0..10) {
             structures.add(
                 Structure(
@@ -808,18 +890,24 @@ class Background(private val screenWidth: Float, private val screenHeight: Float
     }
 
     fun draw(canvas: Canvas) {
+
+        // Dessiner l'image de fond
+        backgroundBitmap?.let { bitmap ->
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+        }
+
         when (backgroundType) {
-            BackgroundType.COSMIC_HORROR_RUINS -> drawCosmicHorrorRuins(canvas)
+            BackgroundType.COSMIC_HORROR_RUINS -> drawByakheeRuins(canvas)
             BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
         }
     }
 
-    private fun drawCosmicHorrorRuins(canvas: Canvas) {
-        canvas.drawColor(Color.BLACK)
+    private fun drawByakheeRuins(canvas: Canvas) {
+        //canvas.drawColor(Color.BLACK)
         drawStars(canvas)
-        paint.color = Color.GRAY
+        paint.color = Color.DKGRAY
         for (structure in structures) {
-            structure.draw(canvas, paint)
+            structure.draw(canvas)
         }
     }
 
@@ -839,19 +927,34 @@ class Background(private val screenWidth: Float, private val screenHeight: Float
 
     fun switchBackground(newType: BackgroundType) {
         backgroundType = newType
+        loadBackgroundImage()
         generateStructures()
     }
 
-    inner class Structure(private val x: Float, private val y: Float, private val width: Float, private val height: Float) {
-        fun draw(canvas: Canvas, paint: Paint) {
-            // Dessiner une structure alien simple
-            paint.color = Color.DKGRAY
-            canvas.drawRect(x, y, x + width, y + height, paint)
-            //canvas.drawLine(x, y, x + width / 2, y - height / 4, paint)
-            //canvas.drawLine(x + width, y, x + width / 2, y - height / 4, paint)
+    inner class Structure(val x: Float, val y: Float, val width: Float, val height: Float) {
+        private val gradientPaint = Paint()
+        private val gradient: LinearGradient
+
+        init {
+            // Créer un gradient de gris allant du gris clair au gris foncé
+            gradient = LinearGradient(
+                x, y, x, y + height,
+                intArrayOf(Color.LTGRAY, Color.DKGRAY),
+                null,
+                Shader.TileMode.CLAMP
+            )
+            gradientPaint.shader = gradient
+        }
+
+        fun draw(canvas: Canvas) {
+            // Dessiner la structure avec le gradient
+            canvas.drawRect(x, y, x + width, y + height, gradientPaint)
+
             // Dessiner les traits blancs pour simuler les briques
-            paint.color = Color.WHITE
-            paint.strokeWidth = 2f // Épaisseur des traits (ajustez selon vos besoins)
+            val brickPaint = Paint().apply {
+                color = Color.WHITE
+                strokeWidth = 2f
+            }
 
             // Calculer la taille des briques et l'espacement
             val brickWidth = width / 5 // 5 briques en largeur
@@ -861,19 +964,25 @@ class Background(private val screenWidth: Float, private val screenHeight: Float
             // Dessiner les lignes horizontales
             for (i in 1..2) { // 2 lignes horizontales
                 val brickY = y + i * brickHeight + (i - 1) * spacing
-                canvas.drawLine(x, brickY, x + width, brickY, paint)
+                canvas.drawLine(x, brickY, x + width, brickY, brickPaint)
             }
 
             // Dessiner les lignes verticales
             for (i in 1..4) { // 4 lignes verticales
                 val brickX = x + i * brickWidth + (i - 1) * spacing
-                canvas.drawLine(brickX, y, brickX, y + height, paint)
+                canvas.drawLine(brickX, y, brickX, y + height, brickPaint)
             }
         }
+
 
         fun intersects(playerX: Float, playerY: Float, playerSize: Float): Boolean {
             return playerX + playerSize / 2 > x && playerX - playerSize / 2 < x + width &&
                     playerY + playerSize / 2 > y && playerY - playerSize / 2 < y + height
+        }
+
+        fun intersectsBulletVersusStruct(objX: Float, objY: Float, objWidth: Float, objHeight: Float): Boolean {
+            return objX < x + width && objX + objWidth > x &&
+                    objY < y + height && objY + objHeight > y
         }
     }
 }
