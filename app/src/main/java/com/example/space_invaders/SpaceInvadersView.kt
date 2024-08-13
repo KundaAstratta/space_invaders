@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Shader
 import android.util.TypedValue
 import android.view.MotionEvent
@@ -30,7 +31,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private val numByakheeRows = 4 // 5 ou 3 lignes
+    private val numByakheeRows = 1//4  lignes
     private val numByakheeCols = 5
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
@@ -53,6 +54,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // Créer un objet Background
     private lateinit var background: Background
+
+    //Transition
+    private var isLevelTransition = false
+    private var transitionAlpha = 0
+    private var levelNumberAlpha = 0
+    private val transitionDuration = 180// Temps des transitions en millisecondes
+    private var transitionCounter = 0
 
     init {
         // L'initialisation se fera dans onSizeChanged
@@ -93,7 +101,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         //createDhole()
 
     }
-
+/*
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -116,7 +124,45 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         update()
         invalidate()
     }
+ */
+override fun onDraw(canvas: Canvas) {
+    super.onDraw(canvas)
 
+    background.draw(canvas)
+
+    if (!isLevelTransition) {
+        // Dessin normal du jeu
+        if (player.isAlive) {
+            player.draw(canvas, paint)
+        }
+        byakhees.forEach { it.draw(canvas, paint) }
+        bullets.forEach { it.draw(canvas, paint) }
+        dhole?.draw(canvas, paint)
+
+        explosions.forEach { explosion ->
+            explosion.forEach { it.draw(canvas, paint) }
+        }
+    }
+
+    // Dessin de l'effet de transition
+    if (isLevelTransition) {
+        // Assombrissement de l'écran
+        paint.color = Color.argb(transitionAlpha, 0, 0, 0)
+        canvas.drawRect(0f, 0f, screenWidth, screenHeight, paint)
+
+        // Affichage du numéro de niveau
+        if (levelNumberAlpha > 0) {
+            paint.color = Color.argb(levelNumberAlpha, 255, 255, 255)
+            paint.textSize = screenHeight / 10 // Taille du texte en fonction de la hauteur de l'écran
+            paint.textAlign = Paint.Align.CENTER
+            val levelText = "STAGE $level"
+            canvas.drawText(levelText, screenWidth / 2, screenHeight / 2, paint)
+        }
+    }
+
+    update()
+    invalidate()
+}
     private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
         val baseColor = Color.rgb(57, 255, 20)  // Green color for the ripple effect
         val maxRipples = 10  // Number of ripple effects
@@ -163,99 +209,108 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     private fun update() {
 
-        bullets.forEach { it.move() }
+        if (isLevelTransition) {
+            handleLevelTransition()
+        } else {
+            // Le reste du code d'update reste inchangé
+            bullets.forEach { it.move() }
 
-        // Vérifier les collisions des balles avec les structures
-        val bulletsToDesrtoy= bullets.filter { bullet ->
-            background.structures.any { structure ->
-                structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.width, bullet.height)
-            }
-        }
-        bullets.removeAll(bulletsToDesrtoy)
-
-        bullets.removeAll { it.y < 0 }
-
-        byakhees.forEach { byakhee ->
-            byakhee.move(screenWidth, screenHeight, speedMultiplier, background.structures)
-            byakhee.changeDirection(speedMultiplier)
-        }
-
-        if (byakheesDestroyed > 0 && byakheesDestroyed % 5 == 0) {
-            speedMultiplier *= 1.1f // Augmentation de 10%
-            byakheesDestroyed++
-        }
-
-        val bulletsToRemove = mutableListOf<Bullet>()
-        val byakheeToRemove = mutableListOf<Byakhee>()
-
-        for (byakhee in byakhees) {
-            if (player.intersects(byakhee)) {
-                if (player.hit()) {
-                    createPlayerExplosion()
-                    checkGameOver()
-                }
-                byakhees.remove(byakhee)
-                break
-            }
-        }
-
-        for (byakhee in byakhees) {
-            for (bullet in bullets) {
-                if (bullet.intersects(byakhee)) {
-                    if (byakhee.hit()) {
-                        createExplosion(byakhee.x, byakhee.y, byakhee.width, byakhee.height)
-                        byakheeToRemove.add(byakhee)
-                    }
-                    bulletsToRemove.add(bullet)
-                    break
+            // Vérifier les collisions des balles avec les structures
+            val bulletsToDesrtoy= bullets.filter { bullet ->
+                background.structures.any { structure ->
+                    structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.width, bullet.height)
                 }
             }
-        }
+            bullets.removeAll(bulletsToDesrtoy)
 
-        byakhees.removeAll { it in byakheeToRemove }
-        bullets.removeAll { it in bulletsToRemove }
+            bullets.removeAll { it.y < 0 }
 
-        // Duplication des ennemis
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastDuplicationTime > duplicationInterval) {
-            duplicateByakhee()
-            lastDuplicationTime = currentTime
-        }
+            byakhees.forEach { byakhee ->
+                byakhee.move(screenWidth, screenHeight, speedMultiplier, background.structures)
+                byakhee.changeDirection(speedMultiplier)
+            }
 
-        explosions.forEach { explosion ->
-            explosion.forEach { it.update() }
-        }
-        explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
-
-        dhole?.let { currentDhole ->
-            currentDhole.move(screenWidth, screenHeight)
-            if (currentDhole.intersectsPlayer(player)) {
-                if (player.hit()) {
-                    createPlayerExplosion()
-                    checkGameOver()
-                }
-                // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
-                currentDhole.setInvincibilityFrame()
+            if (byakheesDestroyed > 0 && byakheesDestroyed % 5 == 0) {
+                speedMultiplier *= 1.1f // Augmentation de 10%
+                byakheesDestroyed++
             }
 
             val bulletsToRemove = mutableListOf<Bullet>()
-            bullets.forEach { bullet ->
-                if (currentDhole.hit(bullet.x, bullet.y)) {
-                    bulletsToRemove.add(bullet)
-                    if (currentDhole.isDestroyed()) {
-                        dhole = null
-                        // Le jeu se termine après avoir vaincu le Dhole
-                        postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
+            val byakheeToRemove = mutableListOf<Byakhee>()
+
+            for (byakhee in byakhees) {
+                if (player.intersects(byakhee)) {
+                    if (player.hit()) {
+                        createPlayerExplosion()
+                        checkGameOver()
+                    }
+                    byakhees.remove(byakhee)
+                    break
+                }
+            }
+
+            for (byakhee in byakhees) {
+                for (bullet in bullets) {
+                    if (bullet.intersects(byakhee)) {
+                        if (byakhee.hit()) {
+                            createExplosion(byakhee.x, byakhee.y, byakhee.width, byakhee.height)
+                            byakheeToRemove.add(byakhee)
+                        }
+                        bulletsToRemove.add(bullet)
+                        break
                     }
                 }
             }
-            bullets.removeAll(bulletsToRemove)
+
+            byakhees.removeAll { it in byakheeToRemove }
+            bullets.removeAll { it in bulletsToRemove }
+
+            // Duplication des ennemis
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastDuplicationTime > duplicationInterval) {
+                duplicateByakhee()
+                lastDuplicationTime = currentTime
+            }
+
+            explosions.forEach { explosion ->
+                explosion.forEach { it.update() }
+            }
+            explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
+
+            dhole?.let { currentDhole ->
+                currentDhole.move(screenWidth, screenHeight)
+                if (currentDhole.intersectsPlayer(player)) {
+                    if (player.hit()) {
+                        createPlayerExplosion()
+                        checkGameOver()
+                    }
+                    // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
+                    currentDhole.setInvincibilityFrame()
+                }
+
+                val bulletsToRemove = mutableListOf<Bullet>()
+                bullets.forEach { bullet ->
+                    if (currentDhole.hit(bullet.x, bullet.y)) {
+                        bulletsToRemove.add(bullet)
+                        if (currentDhole.isDestroyed()) {
+                            dhole = null
+                            // Le jeu se termine après avoir vaincu le Dhole
+                            postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
+                        }
+                    }
+                }
+                bullets.removeAll(bulletsToRemove)
+
+            }
+
+            if (byakhees.isEmpty() && dhole == null) {
+                startNextLevel()
+            }
+
 
         }
 
-        if (byakhees.isEmpty() && dhole == null) {
-            startNextLevel()
-        }
+
 
     }
 
@@ -263,6 +318,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         level++
         speedMultiplier = 1f
         byakheesDestroyed = 0
+
+        isLevelTransition = true
+        transitionCounter = 0
+        transitionAlpha = 0
+        levelNumberAlpha = 0
 
         when {
             level <= maxByakheeLevels -> {
@@ -273,6 +333,40 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             else -> {
                 createDhole()
                 background.switchBackground(Background.BackgroundType.DHOLE_REALM)
+            }
+        }
+    }
+
+    private fun handleLevelTransition() {
+        transitionCounter++
+
+        when {
+            transitionCounter < transitionDuration / 3 -> {
+                // Assombrissement de l'écran
+                transitionAlpha = (255 * transitionCounter / (transitionDuration / 3)).coerceAtMost(255)
+            }
+            transitionCounter < 2 * transitionDuration / 3 -> {
+                // Affichage du numéro de niveau
+                levelNumberAlpha = 255
+            }
+            transitionCounter < transitionDuration -> {
+                // Disparition du numéro de niveau et éclaircissement de l'écran
+                levelNumberAlpha = (255 * (1 - (transitionCounter - 2 * transitionDuration / 3) / (transitionDuration / 3))).coerceAtLeast(0)
+                transitionAlpha = levelNumberAlpha
+            }
+            else -> {
+                // Fin de la transition
+                isLevelTransition = false
+                when {
+                    level <= maxByakheeLevels -> {
+                        createByakhees()
+                        background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
+                    }
+                    else -> {
+                        createDhole()
+                        background.switchBackground(Background.BackgroundType.DHOLE_REALM)
+                    }
+                }
             }
         }
     }
@@ -837,7 +931,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
         }
     }
-
+/*
     private fun generateByakheeRuins() {
         for (i in 0..10) {
             structures.add(
@@ -850,6 +944,27 @@ class Background(private val context: Context, private val screenWidth: Float, p
             )
         }
     }
+*/
+private fun generateByakheeRuins() {
+    val minStructureWidth = screenWidth * 0.05f  // 5% de la largeur de l'écran
+    val maxStructureWidth = screenWidth * 0.15f  // 15% de la largeur de l'écran
+    val minStructureHeight = screenHeight * 0.05f  // 5% de la hauteur de l'écran
+    val maxStructureHeight = screenHeight * 0.2f  // 20% de la hauteur de l'écran
+
+    for (i in 0..10) {
+        val structureWidth = Random.nextFloat() * (maxStructureWidth - minStructureWidth) + minStructureWidth
+        val structureHeight = Random.nextFloat() * (maxStructureHeight - minStructureHeight) + minStructureHeight
+
+        structures.add(
+            Structure(
+                Random.nextFloat() * (screenWidth - structureWidth),
+                Random.nextFloat() * (screenHeight - structureHeight),
+                structureWidth,
+                structureHeight
+            )
+        )
+    }
+}
 
     private fun generateDholeRealm() {
         // Implémentez la génération du décor pour le royaume des Dholes
@@ -919,7 +1034,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             )
             gradientPaint.shader = gradient
         }
-
+/*
         fun draw(canvas: Canvas) {
             // Dessiner la structure avec le gradient
             canvas.drawRect(x, y, x + width, y + height, gradientPaint)
@@ -947,7 +1062,34 @@ class Background(private val context: Context, private val screenWidth: Float, p
                 canvas.drawLine(brickX, y, brickX, y + height, brickPaint)
             }
         }
+*/
+fun draw(canvas: Canvas) {
+    // Dessiner la structure avec le gradient
+    canvas.drawRect(x, y, x + width, y + height, gradientPaint)
 
+    // Dessiner les traits blancs pour simuler les briques
+    val brickPaint = Paint().apply {
+        color = Color.WHITE
+        strokeWidth = width * 0.01f  // Ajuster l'épaisseur des lignes en fonction de la largeur
+    }
+
+    // Calculer la taille des briques et l'espacement
+    val brickWidth = width / 5 // 5 briques en largeur
+    val brickHeight = height / 3 // 3 briques en hauteur
+    val spacing = width * 0.01f // Espacement entre les briques
+
+    // Dessiner les lignes horizontales
+    for (i in 1..2) { // 2 lignes horizontales
+        val brickY = y + i * brickHeight + (i - 1) * spacing
+        canvas.drawLine(x, brickY, x + width, brickY, brickPaint)
+    }
+
+    // Dessiner les lignes verticales
+    for (i in 1..4) { // 4 lignes verticales
+        val brickX = x + i * brickWidth + (i - 1) * spacing
+        canvas.drawLine(brickX, y, brickX, y + height, brickPaint)
+    }
+}
 
         fun intersects(playerX: Float, playerY: Float, playerSize: Float): Boolean {
             return playerX + playerSize / 2 > x && playerX - playerSize / 2 < x + width &&
