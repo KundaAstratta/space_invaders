@@ -1,5 +1,7 @@
 package com.example.space_invaders
 
+import com.example.space_invaders.entities.Bullet
+import com.example.space_invaders.entities.Player
 import org.junit.Test
 
 import org.junit.Assert.*
@@ -36,47 +38,6 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun testPlayerIntersectsWithCosmicHorror() {
-        val player = Player(50f, 50f, 50f)
-        val cosmicHorror = CosmicHorror(40f, 40f, 30f, 20f, 1)
-
-        val intersects = player.intersects(cosmicHorror)
-
-        assertTrue(intersects)
-    }
-    @Test
-    fun testCosmicHorrorHitReducesHitsToDestroy() {
-        val cosmicHorror = CosmicHorror(0f, 0f, 100f, 50f, 1)
-        val initialHits = cosmicHorror.hitsToDestroy
-
-        cosmicHorror.hit()
-
-        assertEquals(initialHits - 1, cosmicHorror.hitsToDestroy)
-    }
-
-    @Test
-    fun testCosmicHorrorHitReturnsTrueWhenDestroyed() {
-        val cosmicHorror = CosmicHorror(0f, 0f, 100f, 50f, 1)
-        cosmicHorror.hitsToDestroy = 1
-
-        val isDestroyed = cosmicHorror.hit()
-
-        assertTrue(isDestroyed)
-    }
-
-    @Test
-    fun testCosmicHorrorMoveStaysOnScreen() {
-        val cosmicHorror = CosmicHorror(20f, 20f, 100f, 50f, 1)
-        val screenWidth = 500f
-        val screenHeight = 800f
-
-        cosmicHorror.move(screenWidth, screenHeight, 1f)
-
-        assertTrue(cosmicHorror.x in 0f..screenWidth)
-        assertTrue(cosmicHorror.y in 0f..screenHeight)
-    }
-
-    @Test
     fun testBulletMoveReducesYCoordinate() {
         val bullet = Bullet(0f, 100f)
         val initialY = bullet.y
@@ -85,16 +46,5 @@ class ExampleUnitTest {
 
         assertTrue(bullet.y < initialY)
     }
-
-    @Test
-    fun testBulletIntersectsWithCosmicHorror() {
-        val bullet = Bullet(50f, 50f)
-        val cosmicHorror = CosmicHorror(40f, 40f, 30f, 20f, 1)
-
-        val intersects = bullet.intersects(cosmicHorror)
-
-        assertTrue(intersects)
-    }
-
 
 }

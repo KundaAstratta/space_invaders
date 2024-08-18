@@ -13,7 +13,7 @@
         android:theme="@style/Theme.AppCompat.NoActionBar"
         tools:targetApi="31">
         <activity
-            android:name=".StartScreenActivity"
+            android:name=".game.StartScreenActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             >
@@ -22,8 +22,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".LevelIntroActivity" />
-        <activity android:name=".MainActivity" />
+        <activity android:name=".game.LevelIntroActivity" />
+        <activity android:name=".game.MainActivity" />
     </application>
 
 </manifest>
