@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.Shader
 import com.example.space_invaders.R
 import kotlin.random.Random
@@ -74,21 +74,20 @@ class Background(private val context: Context, private val screenWidth: Float, p
     }
 
     private fun generateByakheeRuins() {
-        val minStructureWidth = screenWidth * 0.05f  // 5% de la largeur de l'écran
-        val maxStructureWidth = screenWidth * 0.15f  // 15% de la largeur de l'écran
-        val minStructureHeight = screenHeight * 0.05f  // 5% de la hauteur de l'écran
-        val maxStructureHeight = screenHeight * 0.2f  // 20% de la hauteur de l'écran
+        val minStructureRadius = screenWidth.coerceAtMost(screenHeight) * 0.025f  // 2.5% de la dimension la plus petite de l'écran
+        val maxStructureRadius = screenWidth.coerceAtMost(screenHeight) * 0.1f   // 10% de la dimension la plus petite de l'écran
 
-        for (i in 0..10) {
-            val structureWidth = Random.nextFloat() * (maxStructureWidth - minStructureWidth) + minStructureWidth
-            val structureHeight = Random.nextFloat() * (maxStructureHeight - minStructureHeight) + minStructureHeight
+        for (i in 0..15) {
+            val structureRadius = Random.nextFloat() * (maxStructureRadius - minStructureRadius) + minStructureRadius
+
+            val centerX = Random.nextFloat() * (screenWidth - 2 * structureRadius) + structureRadius
+            val centerY = Random.nextFloat() * (screenHeight - 2 * structureRadius) + structureRadius
 
             structures.add(
                 Structure(
-                    Random.nextFloat() * (screenWidth - structureWidth),
-                    Random.nextFloat() * (screenHeight - structureHeight),
-                    structureWidth,
-                    structureHeight
+                    centerX,
+                    centerY,
+                    structureRadius
                 )
             )
         }
@@ -99,7 +98,6 @@ class Background(private val context: Context, private val screenWidth: Float, p
     }
 
     fun draw(canvas: Canvas) {
-
         // Dessiner l'image de fond
         backgroundBitmap?.let { bitmap ->
             canvas.drawBitmap(bitmap, 0f, 0f, null)
@@ -140,14 +138,20 @@ class Background(private val context: Context, private val screenWidth: Float, p
         generateStructures()
     }
 
-    inner class Structure(val x: Float, val y: Float, val width: Float, val height: Float) {
+
+    inner class Structure(val centerX: Float, val centerY: Float, val radius: Float) {
         private val gradientPaint = Paint()
-        private val gradient: LinearGradient
+        private val gradient: RadialGradient
+        private val whitePaint = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = radius * 0.02f
+        }
 
         init {
-            // Créer un gradient de gris allant du gris clair au gris foncé
-            gradient = LinearGradient(
-                x, y, x, y + height,
+            // Créer un gradient radial de gris allant du gris clair au gris foncé
+            gradient = RadialGradient(
+                centerX, centerY, radius,
                 intArrayOf(Color.LTGRAY, Color.DKGRAY),
                 null,
                 Shader.TileMode.CLAMP
@@ -156,44 +160,40 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
 
         fun draw(canvas: Canvas) {
-            // Dessiner la structure avec le gradient
-            canvas.drawRect(x, y, x + width, y + height, gradientPaint)
+            // Dessiner le cercle avec le gradient
+            canvas.drawCircle(centerX, centerY, radius, gradientPaint)
 
-            // Dessiner les traits blancs pour simuler les briques
-            val brickPaint = Paint().apply {
-                color = Color.WHITE
-                strokeWidth = width * 0.01f  // Ajuster l'épaisseur des lignes en fonction de la largeur
+            // Dessiner les "pointes" blanches
+            val numberOfPoints = 8
+            val angleStep = (2 * Math.PI / numberOfPoints).toFloat()
+            for (i in 0 until numberOfPoints) {
+                val angle = i * angleStep
+                val startX = centerX + (radius * 0.8f * Math.cos(angle.toDouble())).toFloat()
+                val startY = centerY + (radius * 0.8f * Math.sin(angle.toDouble())).toFloat()
+                val endX = centerX + (radius * Math.cos(angle.toDouble())).toFloat()
+                val endY = centerY + (radius * Math.sin(angle.toDouble())).toFloat()
+                canvas.drawLine(startX, startY, endX, endY, whitePaint)
             }
 
-            // Calculer la taille des briques et l'espacement
-            val brickWidth = width / 5 // 5 briques en largeur
-            val brickHeight = height / 3 // 3 briques en hauteur
-            val spacing = width * 0.01f // Espacement entre les briques
-
-            // Dessiner les lignes horizontales
-            for (i in 1..2) { // 2 lignes horizontales
-                val brickY = y + i * brickHeight + (i - 1) * spacing
-                canvas.drawLine(x, brickY, x + width, brickY, brickPaint)
-            }
-
-            // Dessiner les lignes verticales
-            for (i in 1..4) { // 4 lignes verticales
-                val brickX = x + i * brickWidth + (i - 1) * spacing
-                canvas.drawLine(brickX, y, brickX, y + height, brickPaint)
+            // Dessiner des cercles concentriques pour donner l'impression de relief
+            for (i in 1..3) {
+                val innerRadius = radius * (1 - 0.2f * i)
+                canvas.drawCircle(centerX, centerY, innerRadius, whitePaint)
             }
         }
 
         fun intersectsPlayerVersusStruct(playerX: Float, playerY: Float, playerSize: Float): Boolean {
-            return playerX + playerSize / 2 > x && playerX - playerSize / 2 < x + width &&
-                    playerY + playerSize / 2 > y && playerY - playerSize / 2 < y + height
+            val distanceX = Math.abs(playerX - centerX)
+            val distanceY = Math.abs(playerY - centerY)
+            val distance = Math.sqrt((distanceX * distanceX + distanceY * distanceY).toDouble()).toFloat()
+            return distance < radius + playerSize / 2
         }
 
         fun intersectsBulletVersusStruct(objX: Float, objY: Float, objDiameter: Float): Boolean {
-            val radius = objDiameter / 2
-
-            return (objX + radius > x && objX - radius < x + width) &&
-                    (objY + radius > y && objY - radius < y + height)
+            val distanceX = Math.abs(objX - centerX)
+            val distanceY = Math.abs(objY - centerY)
+            val distance = Math.sqrt((distanceX * distanceX + distanceY * distanceY).toDouble()).toFloat()
+            return distance < radius + objDiameter / 2
         }
-
     }
 }

@@ -3,6 +3,7 @@ package com.example.space_invaders.entities
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import com.example.space_invaders.backgrounds.Background
 import kotlin.math.PI
 import kotlin.math.abs
@@ -43,7 +44,7 @@ class Player(var x: Float, var y: Float, val size: Float) {
     )
 
     fun draw(canvas: Canvas, paint: Paint) {
-        // Couleur de la boule en fonction des vies restantes
+        // ... (code pour la couleur en fonction des vies inchangé)
         val baseColor = when (lives) {
             3 -> Color.rgb(0, 255, 255)  // Cyan
             2 -> Color.rgb(255, 255, 0)  // Jaune
@@ -51,37 +52,50 @@ class Player(var x: Float, var y: Float, val size: Float) {
             else -> Color.TRANSPARENT
         }
 
-        // Dessiner la boule principale (l'oeil)
-        paint.color = Color.WHITE
-        canvas.drawCircle(x, y, size / 2, paint)
+        // Dessiner la soucoupe volante (corps principal)
+        paint.color = Color.GRAY
+        val saucerRadius = size / 2
+        canvas.drawCircle(x, y, saucerRadius, paint)
 
-        // Dessiner les veines
-        paint.color = Color.RED
-        for (vein in veins) {
-            val startX = x + cos(vein.angle) * vein.distanceFromCenter
-            val startY = y + sin(vein.angle) * vein.distanceFromCenter
-            val endX = startX + cos(vein.angle) * vein.length
-            val endY = startY + sin(vein.angle) * vein.length
-            paint.strokeWidth = vein.width
-            canvas.drawLine(startX, startY, endX, endY, paint)
+        // Ajouter un effet 3D à la soucoupe
+        val path = Path()
+        path.addCircle(x, y, saucerRadius, Path.Direction.CW)
+        paint.setShadowLayer(10f, 0f, 5f, Color.DKGRAY) // Ombre portée pour l'effet 3D
+        canvas.drawPath(path, paint)
+        paint.clearShadowLayer()
+
+        // Ajouter des points noirs le long du bord
+        paint.color = Color.WHITE
+        val numPoints = 20 // Nombre de points à dessiner
+        val angleIncrement = 2 * PI / numPoints
+        val pointRadius = 3f // Rayon de chaque point
+        for (i in 0 until numPoints) {
+            val angle = i * angleIncrement
+            val pointX = x + cos(angle) * saucerRadius
+            val pointY = y + sin(angle) * saucerRadius
+            canvas.drawCircle(pointX.toFloat(), pointY.toFloat(), pointRadius, paint)
         }
 
-        // Dessiner la boule  (l'iris) AVANT la boule noire
+        // Dessiner le dôme central
+        paint.color = Color.LTGRAY
+        val domeRadius = saucerRadius / 3
+        canvas.drawCircle(x, y, domeRadius, paint)
+
+        // Dessiner l'oeil qui tourne au centre du dôme
         paint.color = baseColor
-        val eyeRadius = textureSize / 2 + 10f // Légèrement plus grand que la boule noire
-        val eyeX = x + cos(rotation) * (size / 2 - eyeRadius)
-        val eyeY = y + sin(rotation) * (size / 2 - eyeRadius)
+        val eyeRadius = textureSize / 2 + 10f
+        val eyeX = x + cos(rotation) * (domeRadius - eyeRadius)
+        val eyeY = y + sin(rotation) * (domeRadius - eyeRadius)
         canvas.drawCircle(eyeX, eyeY, eyeRadius, paint)
 
-        // Dessiner la texture (petit cercle noir)
+        // Dessiner la pupille de l'oeil
         paint.color = Color.BLACK
-        val textureX = x + cos(rotation) * (size / 2 - textureSize / 2)
-        val textureY = y + sin(rotation) * (size / 2 - textureSize / 2)
-        canvas.drawCircle(textureX, textureY, textureSize / 2, paint)
+        val pupilRadius = eyeRadius / 3
+        canvas.drawCircle(eyeX, eyeY, pupilRadius, paint)
 
-        // Mise à jour de la rotation seulement si la boule a bougé
+        // Mise à jour de la rotation seulement si la soucoupe a bougé
         val movement = x - lastX
-        if (abs(movement) > 0.1f) {  // Seuil pour éviter les micro-mouvements
+        if (abs(movement) > 0.1f) {
             rotation += movement * rotationSpeed
             if (rotation > 2 * Math.PI) {
                 rotation -= 2 * Math.PI.toFloat()
@@ -125,4 +139,5 @@ class Player(var x: Float, var y: Float, val size: Float) {
         val distance = kotlin.math.hypot(x - byakhee.x - byakhee.width / 2, y - byakhee.y - byakhee.height / 2)
         return distance < size / 2 + kotlin.math.min(byakhee.width, byakhee.height) / 2
     }
+
 }

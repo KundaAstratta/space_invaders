@@ -54,7 +54,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
     private val maxByakheeLevels = 2 // Définissez le nombre de niveaux Byakhee souhaités
-    private val numByakheeRows = 1  //4  lignes //ATTENTION
+    private val numByakheeRows = 3  //4  lignes //ATTENTION
     private val numByakheeCols = 5
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
@@ -66,10 +66,25 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Dhole related variable
     private var dhole: Dhole? = null
 
+    // Variable globale pour le score
+    private var score = 0
+
+    // Liste pour stocker les scores temporaires à afficher
+    private val temporaryScores = mutableListOf<TemporaryScore>()
+
+    // Classe pour représenter un score temporaire
+    data class TemporaryScore(
+        val x: Float,
+        val y: Float,
+        var alpha: Int = 255,
+        var yOffset: Float = 0f
+    )
+
     init {
         // L'initialisation se fera dans onSizeChanged
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 5f
+        paint.isAntiAlias = true // ???
     }
 
     //initialiser et adapter les éléments du jeu (comme le joueur, les ennemis,
@@ -142,8 +157,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
 
+        // Dessiner les scores temporaires
+        temporaryScores.forEach { tempScore ->
+            paint.color = Color.argb(tempScore.alpha, 255, 255, 255)
+            paint.textSize = 150f
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText("+1", tempScore.x, tempScore.y - tempScore.yOffset, paint)
+        }
+
         update()
         invalidate()
+
     }
 
     //Mettre à jour la position du jour entre chaque stage
@@ -241,6 +265,14 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 startNextLevel()
             }
         }
+
+        // Mettre à jour les scores temporaires
+        temporaryScores.forEach {
+            it.alpha -= 5 // Diminuer l'alpha pour l'effet de disparition
+            it.yOffset += 2f // Déplacer le score vers le haut
+        }
+        temporaryScores.removeAll { it.alpha <= 0 } // Supprimer les scores qui ont disparu
+
     }
 
     // Mettre à jour le niveau
@@ -323,6 +355,66 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val touchX = event.x
+        val touchY = event.y
+
+        val touchRadius = dpToPx(context, 200f) // Rayon de contrôle autour du joueur
+        if (!player.isAlive) return true // Ignorer les touches si le joueur est mort
+
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                // Vérifier si le toucher commence près du joueur
+                val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
+                if (distanceToPlayer <= player.size / 2 + touchRadius) {
+                    isPlayerTouched = true
+                    touchOffsetX = player.x - event.x
+                    touchOffsetY = player.y - event.y
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                // Déplacer le joueur seulement si le toucher a commencé près de lui
+                if (isPlayerTouched) {                val newX = event.x + touchOffsetX
+                    val newY = event.y + touchOffsetY
+                    lastDeltaX = newX - player.x
+                    lastDeltaY = newY - player.y
+                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures)
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (isPlayerTouched) {
+                    // Tirer seulement si le toucher est relâché près du joueur
+                    val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
+                    if (distanceToPlayer <= player.size / 2 + touchRadius) {
+                        bullets.add(Bullet(player.x, player.y - player.size / 2,0f,-1f))
+                    }
+                    isPlayerTouched = false
+                }
+            }
+
+
+        }
+
+        //Autres fonctionnalités de mouvement et tir
+
+        return true
+    }
+
+    private fun isTouchInsideCircle(touchX: Float, touchY: Float, circleX: Float, circleY: Float, radius: Float): Boolean {
+        val dx = touchX - circleX
+        val dy = touchY - circleY
+        return dx * dx + dy * dy <= radius * radius
+    }
+
+    fun dpToPx(context: Context, dp: Float): Float {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp,
+            context.resources.displayMetrics
+        )
+    }
+
     // Code spécifique aux Byakhee
     // Code spécifique aux Byakhee
     // Code spécifique aux Byakhee
@@ -351,6 +443,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun updateByakhee() {
+        // Mettre à jour les ennemis
         byakhees.forEach { byakhee ->
             byakhee.move(screenWidth, screenHeight, speedMultiplier, background.structures)
             byakhee.changeDirection(speedMultiplier)
@@ -359,6 +452,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val bulletsToRemove = mutableListOf<Bullet>()
         val byakheeToRemove = mutableListOf<Byakhee>()
 
+        // Vérifier les collisions des ennemis avec le player
         for (byakhee in byakhees) {
             if (player.intersects(byakhee)) {
                 if (player.hit()) {
@@ -370,6 +464,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
 
+        // Vérifier les collisions des ennemis avec les balles
         for (byakhee in byakhees) {
             for (bullet in bullets) {
                 if (bullet.intersects(byakhee)) {
@@ -386,6 +481,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         byakhees.removeAll { it in byakheeToRemove }
         bullets.removeAll { it in bulletsToRemove }
 
+        // Incrémenter le score et ajouter un score temporaire pour chaque Byakhee détruit
+        byakheeToRemove.forEach {
+            score++
+            temporaryScores.add(TemporaryScore(it.x + it.width / 2, it.y + it.height / 2))
+        }
+
+        // Augmentation de la vitesse des ennemis
         if (byakheesDestroyed > 0 && byakheesDestroyed % 5 == 0) {
             speedMultiplier *= 1.1f // Augmentation de 10%
             byakheesDestroyed++
@@ -424,6 +526,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                     bulletsToRemove.add(bullet)
                     if (currentDhole.isDestroyed()) {
                         dhole = null
+                        // Incrémenter le score et ajouter un score temporaire lorsque le Dhole est touché
+                        score++
+                        temporaryScores.add(TemporaryScore(bullet.x, bullet.y))
                         // Le jeu se termine après avoir vaincu le Dhole
                         postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
                     }
@@ -433,53 +538,4 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-
-        val touchRadius = dpToPx(context, 200f) // Rayon de contrôle autour du joueur
-        if (!player.isAlive) return true // Ignorer les touches si le joueur est mort
-
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                // Vérifier si le toucher commence près du joueur
-                val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
-                if (distanceToPlayer <= player.size / 2 + touchRadius) {
-                    isPlayerTouched = true
-                    touchOffsetX = player.x - event.x
-                    touchOffsetY = player.y - event.y
-                }
-            }
-            MotionEvent.ACTION_MOVE -> {
-                // Déplacer le joueur seulement si le toucher a commencé près de lui
-                if (isPlayerTouched) {                val newX = event.x + touchOffsetX
-                    val newY = event.y + touchOffsetY
-                    lastDeltaX = newX - player.x
-                    lastDeltaY = newY - player.y
-                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures)
-                }
-            }
-            MotionEvent.ACTION_UP -> {
-                if (isPlayerTouched) {
-                    // Tirer seulement si le toucher est relâché près du joueur
-                    val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
-                    if (distanceToPlayer <= player.size / 2 + touchRadius) {
-                        bullets.add(Bullet(player.x, player.y - player.size / 2))
-                    }
-                    isPlayerTouched = false
-                }
-            }
-        }
-
-        //Autres fonctionnalités de mouvement et tir
-
-
-        return true
-    }
-
-    fun dpToPx(context: Context, dp: Float): Float {
-        return TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP,
-            dp,
-            context.resources.displayMetrics
-        )
-    }
 }
