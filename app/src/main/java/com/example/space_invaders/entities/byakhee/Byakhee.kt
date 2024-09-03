@@ -1,4 +1,4 @@
-package com.example.space_invaders.entities
+package com.example.space_invaders.entities.byakhee
 
 import android.graphics.Canvas
 import android.graphics.Color

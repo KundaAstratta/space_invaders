@@ -1,8 +1,9 @@
 
-package com.example.space_invaders.game
+package com.example.space_invaders.game.activity
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.example.space_invaders.game.SpaceInvadersView
 
 class MainActivity : AppCompatActivity() {
     private lateinit var gameView: SpaceInvadersView

@@ -1,7 +1,7 @@
 package com.example.space_invaders
 
 import com.example.space_invaders.entities.Bullet
-import com.example.space_invaders.entities.Player
+import com.example.space_invaders.entities.player.Player
 import org.junit.Test
 
 import org.junit.Assert.*

@@ -1,4 +1,4 @@
-package com.example.space_invaders.game
+package com.example.space_invaders.game.activity
 
 import android.content.Intent
 import android.os.Bundle

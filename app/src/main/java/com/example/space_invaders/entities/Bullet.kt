@@ -3,6 +3,7 @@ package com.example.space_invaders.entities
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import com.example.space_invaders.entities.byakhee.Byakhee
 import kotlin.math.sin
 
 class Bullet(var x: Float, var y: Float, private val directionX: Float, private val directionY: Float) {

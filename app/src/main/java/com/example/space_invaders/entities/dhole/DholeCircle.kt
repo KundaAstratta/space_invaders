@@ -3,7 +3,7 @@ package com.example.space_invaders.entities.dhole
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import com.example.space_invaders.entities.Player
+import com.example.space_invaders.entities.player.Player
 
 class DholeCircle(var x: Float, var y: Float, val size: Float) {
     private var hits = 0

@@ -1,10 +1,12 @@
-package com.example.space_invaders.entities
+package com.example.space_invaders.entities.player
 
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import com.example.space_invaders.backgrounds.Background
+import com.example.space_invaders.entities.ExplosionParticle
+import com.example.space_invaders.entities.byakhee.Byakhee
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -20,6 +22,7 @@ class Player(var x: Float, var y: Float, val size: Float) {
     private var lastX = x
     private val veins = mutableListOf<Vein>()
     private val numVeins = 15
+    private var lifeLossAnimation: LifeLossAnimation? = null
 
     init {
         generateVeins()
@@ -27,12 +30,14 @@ class Player(var x: Float, var y: Float, val size: Float) {
 
     private fun generateVeins() {
         for (i in 0 until numVeins) {
-            veins.add(Vein(
+            veins.add(
+                Vein(
                 Random.nextFloat() * 2 * PI.toFloat(),
                 Random.nextFloat() * (size / 2 - textureSize),
                 Random.nextFloat() * (size / 8) + size / 16,
                 Random.nextFloat() * 2 + 1
-            ))
+            )
+            )
         }
     }
 
@@ -104,6 +109,16 @@ class Player(var x: Float, var y: Float, val size: Float) {
             }
         }
         lastX = x
+
+        // Dessiner l'animation de perte de vie si elle existe
+        lifeLossAnimation?.let { animation ->
+            animation.draw(canvas, paint)
+            animation.update()
+            if (animation.isFinished()) {
+                lifeLossAnimation = null
+            }
+        }
+
     }
 
     fun moveTo(newX: Float, newY: Float, screenWidth: Float, screenHeight: Float, structures: List<Background.Structure>) {
@@ -131,6 +146,9 @@ class Player(var x: Float, var y: Float, val size: Float) {
         lives--
         if (lives <= 0) {
             isAlive = false
+        } else {
+            // Créer une nouvelle animation de perte de vie
+            lifeLossAnimation = LifeLossAnimation(x + size / 2, y - size / 2)
         }
         return !isAlive
     }
@@ -139,5 +157,24 @@ class Player(var x: Float, var y: Float, val size: Float) {
         val distance = kotlin.math.hypot(x - byakhee.x - byakhee.width / 2, y - byakhee.y - byakhee.height / 2)
         return distance < size / 2 + kotlin.math.min(byakhee.width, byakhee.height) / 2
     }
+
+    // Créer l'explosion du joueur
+    fun createPlayerExplosion(explosions: MutableList<List<ExplosionParticle>>) {
+        val rippleCount = 5
+        val baseColor = Color.YELLOW
+
+        val particles = List(rippleCount) {
+            ExplosionParticle(
+                x,
+                y,
+                initialSize = 20f,
+                maxSize = 200f,
+                growthRate = Random.nextFloat() * 5 + 2,
+                color = baseColor
+            )
+        }
+        explosions.add(particles)
+    }
+
 
 }

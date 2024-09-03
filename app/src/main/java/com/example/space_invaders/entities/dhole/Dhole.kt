@@ -2,7 +2,7 @@ package com.example.space_invaders.entities.dhole
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.example.space_invaders.entities.Player
+import com.example.space_invaders.entities.player.Player
 import kotlin.math.sin
 import kotlin.random.Random
 

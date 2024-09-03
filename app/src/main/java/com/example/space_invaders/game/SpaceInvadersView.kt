@@ -1,6 +1,7 @@
 package com.example.space_invaders.game
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -11,14 +12,14 @@ import com.example.space_invaders.R
 import com.example.space_invaders.audio.BackgroundSoundManager
 import com.example.space_invaders.backgrounds.Background
 import com.example.space_invaders.entities.Bullet
-import com.example.space_invaders.entities.Byakhee
+import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.ExplosionParticle
 import com.example.space_invaders.entities.dhole.Dhole
-import com.example.space_invaders.entities.Player
+import com.example.space_invaders.entities.player.Player
+import com.example.space_invaders.game.activity.GameOverActivity
 import kotlin.random.Random
 
 class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
-
 
     private lateinit var player: Player
     private val bullets = mutableListOf<Bullet>()
@@ -69,9 +70,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Variable globale pour le score
     private var score = 0
 
-    // Liste pour stocker les scores temporaires à afficher
-    private val temporaryScores = mutableListOf<TemporaryScore>()
-
     // Classe pour représenter un score temporaire
     data class TemporaryScore(
         val x: Float,
@@ -79,6 +77,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         var alpha: Int = 255,
         var yOffset: Float = 0f
     )
+
+    // Liste pour stocker les scores temporaires à afficher
+    private val temporaryScores = mutableListOf<TemporaryScore>()
 
     init {
         // L'initialisation se fera dans onSizeChanged
@@ -177,47 +178,15 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         player.y = screenHeight - playerSize
     }
 
-    //Créer l'explosion du byakhee
-    private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
-        val baseColor = Color.rgb(57, 255, 20)  // Green color for the ripple effect
-        val maxRipples = 10  // Number of ripple effects
-
-        val particles = List(maxRipples) {
-            ExplosionParticle(
-                x + Random.nextFloat() * width,
-                y + Random.nextFloat() * height,
-                initialSize = 10f,  // Start small
-                maxSize = 150f,  // Max size for the ripple
-                growthRate = Random.nextFloat() * 5 + 2,  // Random growth rate
-                color = baseColor
-            )
-        }
-        explosions.add(particles)
-    }
-
-    //Créer l'explosion du joueur
-    private fun createPlayerExplosion() {
-        val rippleCount = 5  // Number of ripples
-        val baseColor = Color.YELLOW  // Color for the player's explosion ripples
-
-        val particles = List(rippleCount) {
-            ExplosionParticle(
-                player.x,
-                player.y,
-                initialSize = 20f,  // Start small
-                maxSize = 200f,  // Max size for the ripple
-                growthRate = Random.nextFloat() * 5 + 2,  // Random growth rate
-                color = baseColor
-            )
-        }
-        explosions.add(particles)
-    }
-
     //Check si le joueur est mort
     private fun checkGameOver() {
+        // Ajouter un effet temporaire pour indiquer la perte d'une vie
         if (!player.isAlive) {
-            createPlayerExplosion()
+            player.createPlayerExplosion(explosions)
             postDelayed({
+                val intent = Intent(context, GameOverActivity::class.java) // Ou utilisez un fragment manager si vous utilisez des fragments
+                intent.putExtra("finalScore", score)
+                context.startActivity(intent)
                 onGameOver()
                 onDestroy()  // Appeler onDestroy pour arrêter le son lorsque le jeu se termine
             }, 1000) // x secondes de délai
@@ -280,6 +249,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         level++
         speedMultiplier = 1f
         byakheesDestroyed = 0
+
+        // Ajouter une vie si le joueur n'en a plus qu'une
+        if (player.lives == 1) {
+            player.lives++
+        }
 
         // Réinitialiser la position du joueur
         resetPlayerPosition()
@@ -356,8 +330,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val touchX = event.x
-        val touchY = event.y
 
         val touchRadius = dpToPx(context, 200f) // Rayon de contrôle autour du joueur
         if (!player.isAlive) return true // Ignorer les touches si le joueur est mort
@@ -397,14 +369,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
 
         //Autres fonctionnalités de mouvement et tir
-
         return true
-    }
-
-    private fun isTouchInsideCircle(touchX: Float, touchY: Float, circleX: Float, circleY: Float, radius: Float): Boolean {
-        val dx = touchX - circleX
-        val dy = touchY - circleY
-        return dx * dx + dy * dy <= radius * radius
     }
 
     fun dpToPx(context: Context, dp: Float): Float {
@@ -456,7 +421,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         for (byakhee in byakhees) {
             if (player.intersects(byakhee)) {
                 if (player.hit()) {
-                    createPlayerExplosion()
+                    player.createPlayerExplosion(explosions) // Appeler la méthode sur l'objet player
                     checkGameOver()
                 }
                 byakhees.remove(byakhee)
@@ -501,6 +466,24 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
+    //Créer l'explosion du byakhee
+    private fun createExplosion(x: Float, y: Float, width: Float, height: Float) {
+        val baseColor = Color.rgb(57, 255, 20)  // Green color for the ripple effect
+        val maxRipples = 10  // Number of ripple effects
+
+        val particles = List(maxRipples) {
+            ExplosionParticle(
+                x + Random.nextFloat() * width,
+                y + Random.nextFloat() * height,
+                initialSize = 10f,  // Start small
+                maxSize = 150f,  // Max size for the ripple
+                growthRate = Random.nextFloat() * 5 + 2,  // Random growth rate
+                color = baseColor
+            )
+        }
+        explosions.add(particles)
+    }
+
     // Code spécifique au Dhole
     // Code spécifique au Dhole
     // Code spécifique au Dhole
@@ -513,7 +496,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             currentDhole.move(screenWidth, screenHeight)
             if (currentDhole.intersectsPlayer(player)) {
                 if (player.hit()) {
-                    createPlayerExplosion()
+                    player.createPlayerExplosion(explosions) // Appeler la méthode sur l'objet player
                     checkGameOver()
                 }
                 // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
