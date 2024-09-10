@@ -16,6 +16,8 @@ import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.ExplosionParticle
 import com.example.space_invaders.entities.dhole.Dhole
 import com.example.space_invaders.entities.player.Player
+import com.example.space_invaders.entities.player.ShootButton
+import com.example.space_invaders.entities.player.ShootDirection
 import com.example.space_invaders.game.activity.GameOverActivity
 import kotlin.random.Random
 
@@ -81,6 +83,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Liste pour stocker les scores temporaires à afficher
     private val temporaryScores = mutableListOf<TemporaryScore>()
 
+    private lateinit var shootButton: ShootButton
+    private val shootButtonSize = 250f // Taille du bouton de tir
+
     init {
         // L'initialisation se fera dans onSizeChanged
         paint.style = Paint.Style.STROKE
@@ -113,8 +118,14 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         // Jouer un son de grésillement différent selon le niveau
         soundManager.playSound(R.raw.tv_static)
-    }
 
+        // Initialiser le bouton de tir
+        shootButton = ShootButton(
+            screenWidth - shootButtonSize - 30f,
+            screenHeight - shootButtonSize - 30f,
+            shootButtonSize
+        )
+    }
 
 
     //Dessiner tous les éléments du jeu sur l'écran
@@ -165,6 +176,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             paint.textAlign = Paint.Align.CENTER
             canvas.drawText("+1", tempScore.x, tempScore.y - tempScore.yOffset, paint)
         }
+
+        // Dessiner le bouton de tir
+        shootButton.draw(canvas, paint)
 
         update()
         invalidate()
@@ -336,6 +350,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                if (shootButton.contains(event.x, event.y)) {
+                    // L'utilisateur a touché le bouton de tir
+                    return true
+                }
                 // Vérifier si le toucher commence près du joueur
                 val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
                 if (distanceToPlayer <= player.size / 2 + touchRadius) {
@@ -346,7 +364,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
             MotionEvent.ACTION_MOVE -> {
                 // Déplacer le joueur seulement si le toucher a commencé près de lui
-                if (isPlayerTouched) {                val newX = event.x + touchOffsetX
+                if (isPlayerTouched) {
+                    val newX = event.x + touchOffsetX
                     val newY = event.y + touchOffsetY
                     lastDeltaX = newX - player.x
                     lastDeltaY = newY - player.y
@@ -355,6 +374,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
 
             MotionEvent.ACTION_UP -> {
+                if (shootButton.contains(event.x, event.y)) {
+                    // Déterminer la direction du tir basée sur la position du toucher dans le bouton
+                    val direction = shootButton.getShootDirection(event.x, event.y)
+                    shoot(direction)
+                    return true
+                }
                 if (isPlayerTouched) {
                     // Tirer seulement si le toucher est relâché près du joueur
                     val distanceToPlayer = kotlin.math.hypot(event.x - player.x, event.y - player.y)
@@ -370,6 +395,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         //Autres fonctionnalités de mouvement et tir
         return true
+    }
+
+    private fun shoot(direction: ShootDirection) {
+        val bulletSpeed = 1f
+        val bulletVelocity = when (direction) {
+            ShootDirection.UP -> Pair(0f, -bulletSpeed)
+            ShootDirection.DOWN -> Pair(0f, bulletSpeed)
+            ShootDirection.LEFT -> Pair(-bulletSpeed, 0f)
+            ShootDirection.RIGHT -> Pair(bulletSpeed, 0f)
+        }
+        bullets.add(Bullet(player.x, player.y, bulletVelocity.first, bulletVelocity.second))
     }
 
     fun dpToPx(context: Context, dp: Float): Float {
