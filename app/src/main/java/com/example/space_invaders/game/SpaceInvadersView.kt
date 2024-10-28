@@ -14,11 +14,16 @@ import com.example.space_invaders.backgrounds.Background
 import com.example.space_invaders.entities.Bullet
 import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.ExplosionParticle
+import com.example.space_invaders.entities.cthulhu.Tentacle
+import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.dhole.Dhole
+import com.example.space_invaders.entities.player.HealthBar
 import com.example.space_invaders.entities.player.Player
 import com.example.space_invaders.entities.player.ShootButton
 import com.example.space_invaders.entities.player.ShootDirection
 import com.example.space_invaders.game.activity.GameOverActivity
+import com.example.space_invaders.levels.rlyehLevel.ScreenDistortionEffect
+import kotlin.math.PI
 import kotlin.random.Random
 
 class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
@@ -44,21 +49,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     //Créer un objet sound manager
     private val soundManager = BackgroundSoundManager(context)
 
-
-    //Transition
-    private var isLevelTransition = false
-    private var transitionAlpha = 0
-    private var levelNumberAlpha = 0
-    private val transitionDuration = 180 // Temps des transitions en millisecondes
-    private var transitionCounter = 0
-
     // Byakhee related variables
     private val byakhees = mutableListOf<Byakhee>()
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
     private val maxByakheeLevels = 2 // Définissez le nombre de niveaux Byakhee souhaités
-    private val numByakheeRows = 3  //4  lignes //ATTENTION
-    private val numByakheeCols = 5
+    private val numByakheeRows = 2  //1  lignes //ATTENTION
+    private val numByakheeCols = 5  //1
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
     private var byakheeHeight = 0f
@@ -66,11 +63,29 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val duplicationInterval = 5000L // Intervalle de duplication en millisecondes (5 secondes)
     private var lastDuplicationTime = 0L // Temps de la dernière duplication
 
+    //DeepOne related variables
+    private val deepOnes = mutableListOf<DeepOne>()
+    private var lastSpawnTime: Long = 0
+    private val spawnInterval: Long = 5000 // 5000 millisecondes = 5s
+    private var deepOneScore = 0
+    private val deepOneScoreToWin = 100 // Nombre de DeepOnes à détruire pour gagner le niveau
+    private var deepOnesDestroyed = 0
+    //Tentacles Chtulhu
+    private val tentacles = mutableListOf<Tentacle>()
+    private var tentaclePaint = Paint()
+    //Distorsion
+    private lateinit var screenDistortionEffect: ScreenDistortionEffect
+    private val distortionPaint = Paint()
+
     // Dhole related variable
     private var dhole: Dhole? = null
 
     // Variable globale pour le score
     private var score = 0
+
+    //Health bar
+    private lateinit var healthBar: HealthBar
+
 
     // Classe pour représenter un score temporaire
     data class TemporaryScore(
@@ -91,6 +106,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 5f
         paint.isAntiAlias = true // ???
+        tentaclePaint = Paint()
+        tentaclePaint.style = Paint.Style.STROKE
+        tentaclePaint.strokeCap = Paint.Cap.ROUND
     }
 
     //initialiser et adapter les éléments du jeu (comme le joueur, les ennemis,
@@ -119,12 +137,24 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Jouer un son de grésillement différent selon le niveau
         soundManager.playSound(R.raw.tv_static)
 
+        // Initialize health bar
+        val healthBarWidth = shootButtonSize
+        val healthBarHeight = 30f
+        val healthBarX = 30f
+        val healthBarY = screenHeight - healthBarHeight - 30f
+        healthBar = HealthBar(healthBarX, healthBarY, healthBarWidth, healthBarHeight)
+
         // Initialiser le bouton de tir
         shootButton = ShootButton(
             screenWidth - shootButtonSize - 30f,
             screenHeight - shootButtonSize - 30f,
             shootButtonSize
         )
+
+        //Distorsion
+        screenDistortionEffect = ScreenDistortionEffect(screenWidth, screenHeight)
+        distortionPaint.style = Paint.Style.FILL
+        distortionPaint.color = Color.argb(100, 0, 255, 255)
     }
 
 
@@ -134,39 +164,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         background.draw(canvas)
 
-        if (!isLevelTransition) {
-            // Dessin normal du jeu
-            if (player.isAlive) {
-                player.draw(canvas, paint)
-            }
-            byakhees.forEach { it.draw(canvas, paint) }
-            bullets.forEach { it.draw(canvas, paint) }
-            dhole?.draw(canvas, paint)
-
-            explosions.forEach { explosion ->
-                explosion.forEach { it.draw(canvas, paint) }
-            }
+        // Dessin normal du jeu
+        if (player.isAlive) {
+            player.draw(canvas, paint)
         }
+        byakhees.forEach { it.draw(canvas, paint) }
+        bullets.forEach { it.draw(canvas, paint) }
+        dhole?.draw(canvas, paint)
+        deepOnes.forEach { it.draw(canvas, paint) }
 
-        // Dessin de l'effet de transition
-        if (isLevelTransition) {
-            // Assombrissement de l'écran
-            paint.color = Color.argb(transitionAlpha, 0, 0, 0)
-            canvas.drawRect(0f, 0f, screenWidth, screenHeight, paint)
-
-            // Affichage du numéro de niveau
-            if (levelNumberAlpha > 0) {
-                paint.color = Color.argb(levelNumberAlpha, 255, 255, 255)
-                paint.textSize = screenHeight / 10 // Taille du texte en fonction de la hauteur de l'écran
-                paint.textAlign = Paint.Align.CENTER
-                var levelText = "STAGE $level"
-                canvas.drawText(levelText, screenWidth / 2, screenHeight / 2, paint)
-                when (level) {
-                    2 -> levelText = "Byakhee"
-                    3 -> levelText = "Dhole"
-                }
-                canvas.drawText(levelText, screenWidth / 2,  screenHeight / 3, paint)
-            }
+        explosions.forEach { explosion ->
+            explosion.forEach { it.draw(canvas, paint) }
         }
 
         // Dessiner les scores temporaires
@@ -177,12 +185,40 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             canvas.drawText("+1", tempScore.x, tempScore.y - tempScore.yOffset, paint)
         }
 
+        // Draw health bar
+        healthBar.draw(canvas, player.lives)
+
         // Dessiner le bouton de tir
         shootButton.draw(canvas, paint)
+
+        // Dessiner les tentacules
+        tentacles.forEach { it.draw(canvas, tentaclePaint) }
+
+        // Dessiner l'effet de distorsion s'il est actif
+        if (screenDistortionEffect.isActive()) {
+            screenDistortionEffect.draw(canvas, distortionPaint)
+        }
 
         update()
         invalidate()
 
+    }
+
+    // Add this method to handle gaining a life
+    fun playerGainLife() {
+        if (player.lives < 15) {
+            player.lives++
+            invalidate() // Force redraw to update health bar
+        }
+    }
+
+    // Modify the existing player.hit() calls to update the health bar
+    private fun updatePlayerHealth() {
+        if (player.hit()) {
+            player.createPlayerExplosion(explosions)
+            checkGameOver()
+        }
+        invalidate() // Force redraw to update health bar
     }
 
     //Mettre à jour la position du jour entre chaque stage
@@ -200,6 +236,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             postDelayed({
                 val intent = Intent(context, GameOverActivity::class.java) // Ou utilisez un fragment manager si vous utilisez des fragments
                 intent.putExtra("finalScore", score)
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 onGameOver()
                 onDestroy()  // Appeler onDestroy pour arrêter le son lorsque le jeu se termine
@@ -209,45 +246,53 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // Mettre à jour l'état du jeu
     private fun update() {
-        if (isLevelTransition) {
-            // Mettre à jour l'effet de transition
-            handleLevelTransition()
-        } else {
-            bullets.forEach { it.move() }
 
-            // Vérification des collisions des bullets avec les structures
+        bullets.forEach { it.move() }
 
-            val bulletsToRemove = mutableListOf<Bullet>()  // Créer une liste temporaire pour les bullets à supprimer
+        // Vérification des collisions des bullets avec les structures
 
-            bullets.forEach { bullet ->
-                // Vérifier les collisions avec les structures
-                if (background.structures.any { structure ->
-                        structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.maxRadius * 2)
-                    }) {
-                    bulletsToRemove.add(bullet)  // Ajouter la bullet à la liste des bullets à supprimer
-                }
-            }
+        val bulletsToRemove = mutableListOf<Bullet>()  // Créer une liste temporaire pour les bullets à supprimer
 
-            // Supprimer les bullets qui ont touché une structure
-            bullets.removeAll(bulletsToRemove)
-            // Supprimer les balles hors de l'écran
-            bullets.removeAll { it.y < 0 }
-
-            // Mettre à jour les ennemis
-            updateByakhee()
-            updateDhole()
-
-            //explosion
-            explosions.forEach { explosion ->
-                explosion.forEach { it.update() }
-            }
-            explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
-
-            // Vérifier si le niveau est terminé
-            if (byakhees.isEmpty() && dhole == null) {
-                startNextLevel()
+        bullets.forEach { bullet ->
+            // Vérifier les collisions avec les structures
+            if (background.structures.any { structure ->
+                    structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.maxRadius * 2)
+                }) {
+                bulletsToRemove.add(bullet)  // Ajouter la bullet à la liste des bullets à supprimer
             }
         }
+
+        // Supprimer les bullets qui ont touché une structure
+        bullets.removeAll(bulletsToRemove)
+        // Supprimer les balles hors de l'écran
+        bullets.removeAll { it.y < 0 }
+
+        // Mettre à jour les ennemis
+        when {
+            level <= maxByakheeLevels -> updateByakhee()
+            level == 3 -> updateDhole()
+            level == 4 -> { //R'lyeh level
+                screenDistortionEffect.update()
+                updateDeepOne()
+                updateTentacles()
+            }
+        }
+
+        //explosion
+        explosions.forEach { explosion ->
+            explosion.forEach { it.update() }
+        }
+        explosions.removeAll { explosion -> explosion.all { !it.isAlive() } }
+
+        // Vérifier si le niveau est terminé
+        if (
+            (level <= maxByakheeLevels && byakhees.isEmpty()) ||
+            (level == 3 && dhole == null) ||
+            (level == 4 && deepOneScore >= deepOneScoreToWin)
+        ) {
+            startNextLevel()
+        }
+
 
         // Mettre à jour les scores temporaires
         temporaryScores.forEach {
@@ -259,15 +304,14 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     // Mettre à jour le niveau
+
     private fun startNextLevel() {
         level++
         speedMultiplier = 1f
         byakheesDestroyed = 0
 
-        // Ajouter une vie si le joueur n'en a plus qu'une
-        if (player.lives == 1) {
-            player.lives++
-        }
+        // Mettre à jour la barre de vie +1 ?
+        playerGainLife()
 
         // Réinitialiser la position du joueur
         resetPlayerPosition()
@@ -277,11 +321,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         // Réinitialiser les balles
         bullets.clear()
-
-        isLevelTransition = true
-        transitionCounter = 0
-        transitionAlpha = 0
-        levelNumberAlpha = 0
 
         // Jouer un son de grésillement différent selon le niveau
         when  {
@@ -295,9 +334,14 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 createByakhees()
                 background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
             }
-            else -> {
+            level == 3 -> {
                 createDhole()
                 background.switchBackground(Background.BackgroundType.DHOLE_REALM)
+            }
+            else -> {
+                createDeepOnes()
+                //deepOneScore = 0 // Réinitialiser le score DeepOne
+                background.switchBackground(Background.BackgroundType.RLYEH)
             }
         }
     }
@@ -305,42 +349,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Méthode à appeler pour libérer les ressources lorsque le jeu se termine ou est détruit
     fun onDestroy() {
         soundManager.release()
-    }
-
-    // Mettre à jour l'effet de transition
-    private fun handleLevelTransition() {
-        transitionCounter++
-
-        when {
-            transitionCounter < transitionDuration / 3 -> {
-                // Assombrissement de l'écran
-                transitionAlpha = (255 * transitionCounter / (transitionDuration / 3)).coerceAtMost(255)
-            }
-            transitionCounter < 2 * transitionDuration / 3 -> {
-                // Affichage du numéro de niveau
-                levelNumberAlpha = 255
-            }
-            transitionCounter < transitionDuration -> {
-                // Disparition du numéro de niveau et éclaircissement de l'écran
-                levelNumberAlpha = (255 * (1 - (transitionCounter - 2 * transitionDuration / 3) / (transitionDuration / 3))).coerceAtLeast(0)
-                transitionAlpha = levelNumberAlpha
-            }
-            else -> {
-                // Fin de la transition
-                isLevelTransition = false
-                resetPlayerPosition()
-                when {
-                    level <= maxByakheeLevels -> {
-                        createByakhees()
-                        background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
-                    }
-                    else -> {
-                        createDhole()
-                        background.switchBackground(Background.BackgroundType.DHOLE_REALM)
-                    }
-                }
-            }
-        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -453,22 +461,19 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val bulletsToRemove = mutableListOf<Bullet>()
         val byakheeToRemove = mutableListOf<Byakhee>()
 
-        // Vérifier les collisions des ennemis avec le player
+        // Vérifier les collisions des Byakhee avec le player
         for (byakhee in byakhees) {
-            if (player.intersects(byakhee)) {
-                if (player.hit()) {
-                    player.createPlayerExplosion(explosions) // Appeler la méthode sur l'objet player
-                    checkGameOver()
-                }
+            if (player.intersectsByakhee(byakhee)) {
+                updatePlayerHealth()
                 byakhees.remove(byakhee)
                 break
             }
         }
 
-        // Vérifier les collisions des ennemis avec les balles
+        // Vérifier les collisions des Byakhee avec les balles
         for (byakhee in byakhees) {
             for (bullet in bullets) {
-                if (bullet.intersects(byakhee)) {
+                if (bullet.intersectsByakhee(byakhee)) {
                     if (byakhee.hit()) {
                         createExplosion(byakhee.x, byakhee.y, byakhee.width, byakhee.height)
                         byakheeToRemove.add(byakhee)
@@ -531,10 +536,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         dhole?.let { currentDhole ->
             currentDhole.move(screenWidth, screenHeight)
             if (currentDhole.intersectsPlayer(player)) {
-                if (player.hit()) {
-                    player.createPlayerExplosion(explosions) // Appeler la méthode sur l'objet player
-                    checkGameOver()
-                }
+                updatePlayerHealth()
                 // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
                 currentDhole.setInvincibilityFrame()
             }
@@ -549,12 +551,156 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                         score++
                         temporaryScores.add(TemporaryScore(bullet.x, bullet.y))
                         // Le jeu se termine après avoir vaincu le Dhole
-                        postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
+                        //postDelayed({ onGameOver() }, 1000) // Délai d'une seconde avant de terminer le jeu
                     }
                 }
             }
             bullets.removeAll(bulletsToRemove)
         }
+    }
+
+
+    // Code spécifique au DeepOne
+    // Code spécifique au DeepOne
+    // Code spécifique au DeepOne
+    fun createDeepOnes() {
+        // Logique pour créer les ennemis "deepOnes" en haut de l'écran
+        // Vous devrez adapter cela en fonction de la façon dont vous avez implémenté la classe deepOne
+        val deepOneWidth = screenWidth / 10
+        val deepOneHeight = deepOneWidth
+        val startX = Random.nextFloat() * (screenWidth - deepOneWidth)
+        val startY = 0f // En haut de l'écran
+
+        deepOnes.add(DeepOne(startX, startY, deepOneWidth, deepOneHeight,screenWidth,screenHeight))
+    }
+
+   // fun getDeepOnes(): List<DeepOne> = deepOnes
+
+    fun updateDeepOne() {
+        // Gestion du temps pour faire apparaître de nouveaux ennemis
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastSpawnTime > spawnInterval) {
+            createDeepOnes()
+            lastSpawnTime = currentTime
+        }
+
+        // Mettre à jour les ennemis
+        deepOnes.forEach { deepOne ->
+            deepOne.move()
+            deepOne.attackPlayer(player) // Attaque du joueur toutes les 15 secondes
+
+            // Vérifier si le DeepOne touche une structure cyclopéenne
+            if (background.backgroundType == Background.BackgroundType.RLYEH) {
+                val cyclopeanStructures = background.structures.filterIsInstance<Background.CyclopeanStructure>()
+                for (structure in cyclopeanStructures) {
+                    if (structure.intersectsDeepOneVsStruct(deepOne)) {
+                        // Faire disparaître le DeepOne et le faire réapparaître près d'une autre structure au hasard
+                        val randomStructure = cyclopeanStructures.random()
+                        deepOne.x = randomStructure.centerX + Random.nextFloat() * randomStructure.size - randomStructure.size / 2
+                        deepOne.y = randomStructure.centerY + Random.nextFloat() * randomStructure.size - randomStructure.size / 2
+                        break
+                    }
+                }
+            }
+        }
+
+
+        // Gestion des collisions de DeepOne avec les balles
+        val bulletsToRemove = mutableListOf<Bullet>()
+        val deepOnesToRemove = mutableListOf<DeepOne>()
+
+        for (deepOne in deepOnes) {
+            for (bullet in bullets) {
+                if (bullet.intersectsDeepOne(deepOne)) {
+                    if (deepOne.hit()) {
+                        deepOnesToRemove.add(deepOne)
+                        createExplosion(deepOne.x, deepOne.y, deepOne.width, deepOne.height)
+                        deepOneScore++
+                        // Incrémenter le score et ajouter un score temporaire
+                        score++
+                        temporaryScores.add(SpaceInvadersView.TemporaryScore(deepOne.x + deepOne.width / 2, deepOne.y + deepOne.height / 2))
+
+                        deepOnesDestroyed++
+                        if (deepOnesDestroyed == 6) {
+                            screenDistortionEffect.start() // Démarrer l'effet de distorsion
+                            triggerChaosEvent()
+                            spawnTentacle()
+                            deepOnesDestroyed = 0
+                        }
+
+                    }
+                    bulletsToRemove.add(bullet)
+                    break
+                }
+            }
+        }
+
+        // Vérifier les collisions des DeepOne avec le player
+        for (deepOne in deepOnes) {
+            if (player.intersectsDeepOne(deepOne)) {
+                updatePlayerHealth()
+                deepOnes.remove(deepOne)
+                break
+            }
+        }
+
+        // Vérifier les collisions des IchorousBlasts avec le joueur
+
+        for (deepOne in deepOnes) {
+            for (blast in deepOne.ichorousBlasts) {
+                if (player.intersectsIchorousBlast(blast)) {
+                    updatePlayerHealth()
+                    deepOne.ichorousBlasts.remove(blast) // Supprimer le blast après collision
+                    break
+                }
+            }
+        }
+
+        deepOnes.removeAll(deepOnesToRemove)
+        bullets.removeAll(bulletsToRemove)
+    }
+
+    private fun triggerChaosEvent() {
+        deepOnesDestroyed = 0
+        background.redistributeStructures()
+    }
+
+    // Code spécifique aux Tentacules
+    // Code spécifique aux Tentacules
+    // Code spécifique aux Tentacules
+    fun updateTentacles() {
+        // Mise à jour et vérification des collisions pour les tentacules
+        val tentaclesToRemove = mutableListOf<Tentacle>()
+        for (tentacle in tentacles) {
+            tentacle.update()
+
+            // Vérifier les collisions avec les balles
+            for (bullet in bullets) {
+                if (tentacle.intersectsPlayer(bullet.x, bullet.y, bullet.maxRadius)) {
+                    if (tentacle.hit()) {
+                        tentaclesToRemove.add(tentacle)
+                    }
+                    bullets.remove(bullet)
+                    break
+                }
+            }
+
+            // Vérifier la collision avec le joueur
+            if (tentacle.intersectsPlayer(player.x, player.y, player.size / 2)) {
+                updatePlayerHealth()
+                break
+            }
+        }
+
+        tentacles.removeAll(tentaclesToRemove)
+    }
+
+    private fun spawnTentacle() {
+        val startX = Random.nextFloat() * screenWidth
+        val startY = Random.nextFloat() * screenHeight
+        val direction = Random.nextFloat() * 2 * PI.toFloat()
+        val tentacle = Tentacle(startX, startY, screenWidth / 2, direction)
+        tentacles.add(tentacle)
     }
 
 }

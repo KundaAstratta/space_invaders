@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import com.example.space_invaders.entities.byakhee.Byakhee
+import com.example.space_invaders.entities.deepone.DeepOne
 import kotlin.math.sin
 
 class Bullet(var x: Float, var y: Float, private val directionX: Float, private val directionY: Float) {
@@ -48,9 +49,15 @@ class Bullet(var x: Float, var y: Float, private val directionX: Float, private 
     }
 
     // Méthode pour vérifier les collisions avec un ennemi Byakhee
-    fun intersects(byakhee: Byakhee): Boolean {
+    fun intersectsByakhee(byakhee: Byakhee): Boolean {
         val radius = maxRadius
         return (x + radius > byakhee.x && x - radius < byakhee.x + byakhee.width) &&
                 (y + radius > byakhee.y && y - radius < byakhee.y + byakhee.height)
+    }
+
+    fun intersectsDeepOne(deepOne: DeepOne): Boolean {
+        val radius = maxRadius
+        return (x + radius > deepOne.x && x - radius < deepOne.x + deepOne.width) &&
+                (y + radius > deepOne.y && y - radius < deepOne.y + deepOne.height)
     }
 }

@@ -7,46 +7,25 @@ import android.graphics.Path
 import com.example.space_invaders.backgrounds.Background
 import com.example.space_invaders.entities.ExplosionParticle
 import com.example.space_invaders.entities.byakhee.Byakhee
+import com.example.space_invaders.entities.deepone.DeepOne
+import com.example.space_invaders.entities.deepone.IchorousBlast
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.random.Random
 
 class Player(var x: Float, var y: Float, val size: Float) {
-    var lives = 3
+    var lives = 15
     var isAlive = true
     private var rotation = 0f
     private val rotationSpeed = 0.1f
     private val textureSize = size / 4f
     private var lastX = x
-    private val veins = mutableListOf<Vein>()
+  //  private val veins = mutableListOf<Vein>()
     private val numVeins = 15
     private var lifeLossAnimation: LifeLossAnimation? = null
-
-    init {
-        generateVeins()
-    }
-
-    private fun generateVeins() {
-        for (i in 0 until numVeins) {
-            veins.add(
-                Vein(
-                Random.nextFloat() * 2 * PI.toFloat(),
-                Random.nextFloat() * (size / 2 - textureSize),
-                Random.nextFloat() * (size / 8) + size / 16,
-                Random.nextFloat() * 2 + 1
-            )
-            )
-        }
-    }
-
-    data class Vein(
-        val angle: Float,
-        val distanceFromCenter: Float,
-        val length: Float,
-        val width: Float
-    )
 
     fun draw(canvas: Canvas, paint: Paint) {
         // ... (code pour la couleur en fonction des vies inchangé)
@@ -153,9 +132,19 @@ class Player(var x: Float, var y: Float, val size: Float) {
         return !isAlive
     }
 
-    fun intersects(byakhee: Byakhee): Boolean {
+    fun intersectsByakhee(byakhee: Byakhee): Boolean {
         val distance = kotlin.math.hypot(x - byakhee.x - byakhee.width / 2, y - byakhee.y - byakhee.height / 2)
         return distance < size / 2 + kotlin.math.min(byakhee.width, byakhee.height) / 2
+    }
+
+    fun intersectsDeepOne(deepOne: DeepOne): Boolean {
+        val distance = kotlin.math.hypot(x - deepOne.x - deepOne.width / 2, y - deepOne.y - deepOne.height / 2)
+        return distance < size / 2 + kotlin.math.min(deepOne.width, deepOne.height) / 2
+    }
+
+    fun intersectsIchorousBlast(blast: IchorousBlast): Boolean {
+        val distance = hypot(x - blast.x, y - blast.y)
+        return distance < size / 2 + blast.radius
     }
 
     // Créer l'explosion du joueur

@@ -7,13 +7,20 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 class Dhole(var x: Float, var y: Float, val circleSize: Float) {
-    private val numCircles = 15
+    private val numCircles = 15//2
     private val circles = mutableListOf<DholeCircle>()
     private var time = 0f
-    private var dx = Random.nextFloat() * 4 - 2 // Vitesse horizontale aléatoire
-    private var dy = Random.nextFloat() * 4 - 2 // Vitesse verticale aléatoire
-    private val maxSpeed = 5f
-    private val changeDirectionChance = 0.02f // 2% de chance de changer de direction à chaque frame
+    //private var dx = Random.nextFloat() * 4 - 2 // Vitesse horizontale aléatoire
+    //private var dy = Random.nextFloat() * 4 - 2 // Vitesse verticale aléatoire
+    // Je dimainue la viteese
+    private var dx = Random.nextFloat() * 2 - 1 // Vitesse horizontale aléatoire réduite
+    private var dy = Random.nextFloat() * 2 - 1 // Vitesse verticale aléatoire réduite
+    //private val maxSpeed = 5f
+    // Je dimainue la viteese
+    private val maxSpeed = 3f
+    //private val changeDirectionChance = 0.02f // 2% de chance de changer de direction à chaque frame
+    // Je dimainue la viteese
+    private val changeDirectionChance = 0.01f // 1% de chance de changer de direction à chaque frame
     private var invincibilityFrames = 0
 
     init {
@@ -31,9 +38,10 @@ class Dhole(var x: Float, var y: Float, val circleSize: Float) {
     }
 
     fun move(screenWidth: Float, screenHeight: Float) {
+        val slowFactor = 0.7f // Facteur de ralentissement (1.0 = pas de ralentissement, 0.5 = moitié de la vitesse)
         // Mise à jour de la position
-        x += dx
-        y += dy
+        x += dx * slowFactor
+        y += dy * slowFactor
 
         if (invincibilityFrames > 0) {
             invincibilityFrames--

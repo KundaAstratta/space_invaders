@@ -6,20 +6,24 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
 import com.example.space_invaders.R
+import com.example.space_invaders.entities.deepone.DeepOne
 import kotlin.random.Random
 
 class Background(private val context: Context, private val screenWidth: Float, private val screenHeight: Float) {
     private val paint = Paint()
     val structures = mutableListOf<Structure>()
-    private var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
+    var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
     private var backgroundBitmap: Bitmap? = null
 
     enum class BackgroundType {
         COSMIC_HORROR_RUINS,
-        DHOLE_REALM
+        DHOLE_REALM,
+        RLYEH
         // Ajoutez d'autres types de fond ici au besoin
     }
 
@@ -32,6 +36,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
         val resourceId = when (backgroundType) {
             BackgroundType.COSMIC_HORROR_RUINS -> R.drawable.byakhee_horror_background
             BackgroundType.DHOLE_REALM -> R.drawable.dhole_realm_background
+            BackgroundType.RLYEH -> R.drawable.rlyeh_background // Assurez-vous d'avoir cette image
+
         }
 
         val options = BitmapFactory.Options().apply {
@@ -70,6 +76,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
         when (backgroundType) {
             BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins()
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
+            BackgroundType.RLYEH -> generateRlyehStructures()
         }
     }
 
@@ -97,6 +104,27 @@ class Background(private val context: Context, private val screenWidth: Float, p
         // Implémentez la génération du décor pour le royaume des Dholes
     }
 
+    // Redistribue les structures après le changement de fond
+    fun redistributeStructures() {
+        structures.clear()
+        when (backgroundType) {
+            BackgroundType.RLYEH -> generateRlyehStructures()
+            else -> {} // Ne rien faire pour les autres types de fond
+        }
+    }
+
+    private fun generateRlyehStructures() {
+        val minStructureSize = screenWidth.coerceAtMost(screenHeight) * 0.1f
+        val maxStructureSize = screenWidth.coerceAtMost(screenHeight) * 0.3f
+
+        for (i in 0..10) {
+            val structureSize = Random.nextFloat() * (maxStructureSize - minStructureSize) + minStructureSize
+            val centerX = Random.nextFloat() * (screenWidth - structureSize) + structureSize / 2
+            val centerY = Random.nextFloat() * (screenHeight - structureSize) + structureSize / 2
+            structures.add(CyclopeanStructure(centerX, centerY, structureSize))
+        }
+    }
+
     fun draw(canvas: Canvas) {
         // Dessiner l'image de fond
         backgroundBitmap?.let { bitmap ->
@@ -106,6 +134,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
         when (backgroundType) {
             BackgroundType.COSMIC_HORROR_RUINS -> drawByakheeRuins(canvas)
             BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
+            BackgroundType.RLYEH -> drawRlyehStructures(canvas)
         }
     }
 
@@ -123,6 +152,15 @@ class Background(private val context: Context, private val screenWidth: Float, p
         drawStars(canvas)
     }
 
+    private fun drawRlyehStructures(canvas: Canvas) {
+        drawStars(canvas)
+        for (structure in structures) {
+            if (structure is CyclopeanStructure) {
+                structure.draw(canvas)
+            }
+        }
+    }
+
     private fun drawStars(canvas: Canvas) {
         paint.color = Color.WHITE
         for (i in 0..200) {
@@ -138,8 +176,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
         generateStructures()
     }
 
-
-    inner class Structure(val centerX: Float, val centerY: Float, val radius: Float) {
+    open inner class Structure(val centerX: Float, val centerY: Float, val radius: Float) {
         private val gradientPaint = Paint()
         private val gradient: RadialGradient
         private val whitePaint = Paint().apply {
@@ -159,7 +196,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             gradientPaint.shader = gradient
         }
 
-        fun draw(canvas: Canvas) {
+        open fun draw(canvas: Canvas) {
             // Dessiner le cercle avec le gradient
             canvas.drawCircle(centerX, centerY, radius, gradientPaint)
 
@@ -194,6 +231,42 @@ class Background(private val context: Context, private val screenWidth: Float, p
             val distanceY = Math.abs(objY - centerY)
             val distance = Math.sqrt((distanceX * distanceX + distanceY * distanceY).toDouble()).toFloat()
             return distance < radius + objDiameter / 2
+        }
+    }
+
+    inner class CyclopeanStructure(centerX: Float, centerY: Float, val size: Float) : Structure(centerX, centerY, size / 2) {
+        private val path = Path()
+        private val color = Color.argb(150, Random.nextInt(100, 200), Random.nextInt(100, 200), Random.nextInt(100, 200))
+
+        init {
+            path.moveTo(centerX, centerY - size / 2)
+            val numPoints = Random.nextInt(5, 8)
+            for (i in 1..numPoints) {
+                val angle = i * (2 * Math.PI / numPoints)
+                val radius = size / 2 * (0.5f + Random.nextFloat() * 0.5f)
+                val px = centerX + (radius * Math.cos(angle)).toFloat()
+                val py = centerY + (radius * Math.sin(angle)).toFloat()
+                path.lineTo(px, py)
+            }
+            path.close()
+        }
+
+        override fun draw(canvas: Canvas) {
+            paint.color = color
+            paint.style = Paint.Style.FILL
+            canvas.drawPath(path, paint)
+
+            paint.color = Color.BLACK
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2f
+            canvas.drawPath(path, paint)
+        }
+
+        fun intersectsDeepOneVsStruct(entity: DeepOne): Boolean {
+            val entityRect = RectF(entity.x, entity.y, entity.x + entity.width, entity.y + entity.height)
+            val structureBounds = RectF()
+            path.computeBounds(structureBounds, true)
+            return RectF.intersects(entityRect, structureBounds)
         }
     }
 }
