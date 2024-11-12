@@ -3,7 +3,6 @@ package com.example.space_invaders.entities.cthulhu
 import android.graphics.*
 import kotlin.math.*
 
-
 class Tentacle(
     var startX: Float,
     var startY: Float,
@@ -11,13 +10,13 @@ class Tentacle(
     val direction: Float
 ) {
     var health = 50
-    private val segments = 30
+    private val segments = 40
     private val controlPoints = mutableListOf<PointF>()
-    private val amplitude = 80f
-    //private val frequency = 0.05f
+    private val amplitude = 100f
+    private val phaseSpeed = 0.08f
     private var phase = 0f
-    private val maxThickness = 40f
-    private val minThickness = 10f
+    private val maxThickness = 50f
+    private val minThickness = 20f
 
     init {
         generateControlPoints()
@@ -29,7 +28,7 @@ class Tentacle(
             val t = i.toFloat() / segments
             val x = startX + t * length * cos(direction)
             val y = startY + t * length * sin(direction)
-            val offset = sin((t * 2 * PI + phase).toFloat()) * amplitude * (1 - t)
+            val offset = sin((t * 4 * PI + phase).toFloat()) * amplitude * (1 - t.pow(2))
 
             val perpX = sin(direction).toFloat()
             val perpY = -cos(direction).toFloat()
@@ -39,7 +38,7 @@ class Tentacle(
     }
 
     fun update() {
-        phase += 0.1f
+        phase += phaseSpeed
         generateControlPoints()
     }
 
@@ -58,7 +57,7 @@ class Tentacle(
         // Create gradient for more realistic coloring
         val gradient = LinearGradient(
             startX, startY, controlPoints.last().x, controlPoints.last().y,
-            intArrayOf(Color.rgb(0, 100, 0), Color.rgb(0, 200, 0), Color.rgb(150, 255, 150)),
+            intArrayOf(Color.rgb(64, 0, 64), Color.rgb(128, 0, 128), Color.rgb(192, 64, 192)),
             null, Shader.TileMode.CLAMP
         )
 
@@ -96,4 +95,3 @@ class Tentacle(
         return health <= 0
     }
 }
-

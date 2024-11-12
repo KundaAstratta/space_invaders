@@ -14,6 +14,7 @@ import com.example.space_invaders.backgrounds.Background
 import com.example.space_invaders.entities.Bullet
 import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.ExplosionParticle
+import com.example.space_invaders.entities.coloroutofspace.ColorOutOfSpace
 import com.example.space_invaders.entities.cthulhu.Tentacle
 import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.dhole.Dhole
@@ -54,8 +55,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
     private val maxByakheeLevels = 2 // Définissez le nombre de niveaux Byakhee souhaités
-    private val numByakheeRows = 2  //1  lignes //ATTENTION
-    private val numByakheeCols = 5  //1
+    private val numByakheeRows = 3//1  //  lignes //ATTENTION
+    private val numByakheeCols = 5//2
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
     private var byakheeHeight = 0f
@@ -68,7 +69,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var lastSpawnTime: Long = 0
     private val spawnInterval: Long = 5000 // 5000 millisecondes = 5s
     private var deepOneScore = 0
-    private val deepOneScoreToWin = 100 // Nombre de DeepOnes à détruire pour gagner le niveau
+    private val deepOneScoreToWin = 70//7 // Nombre de DeepOnes à détruire pour gagner le niveau
     private var deepOnesDestroyed = 0
     //Tentacles Chtulhu
     private val tentacles = mutableListOf<Tentacle>()
@@ -79,6 +80,18 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // Dhole related variable
     private var dhole: Dhole? = null
+
+    // ColorOutOfSpace related variables
+    private val colorOutOfSpaces = mutableListOf<ColorOutOfSpace>()
+    private val maxColorOutOfSpaceLevel = 5 // Définissez le niveau ColorOutOfSpace
+    private var colorOutOfSpaceDestroyed = 0
+    private var colorOutOfSpaceScoreToWin = 100 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
+
+
+    //Transition
+    private var transitionAlpha = 255 // Nouvelle variable pour l'alpha de la transition
+    private var isTransitioning = false // Nouvelle variable pour indiquer si une transition est en cours
+
 
     // Variable globale pour le score
     private var score = 0
@@ -155,6 +168,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         screenDistortionEffect = ScreenDistortionEffect(screenWidth, screenHeight)
         distortionPaint.style = Paint.Style.FILL
         distortionPaint.color = Color.argb(100, 0, 255, 255)
+
+        // Initialiser les ennemis ColorOutOfSpace
+        if (level == maxColorOutOfSpaceLevel) {
+            createColorOutOfSpace()
+        }
     }
 
 
@@ -172,6 +190,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         bullets.forEach { it.draw(canvas, paint) }
         dhole?.draw(canvas, paint)
         deepOnes.forEach { it.draw(canvas, paint) }
+        colorOutOfSpaces.forEach { it.draw(canvas, paint) }
 
         explosions.forEach { explosion ->
             explosion.forEach { it.draw(canvas, paint) }
@@ -197,6 +216,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Dessiner l'effet de distorsion s'il est actif
         if (screenDistortionEffect.isActive()) {
             screenDistortionEffect.draw(canvas, distortionPaint)
+        }
+
+        // Appliquer la transition
+        if (isTransitioning) {
+            // Générer des couleurs HSV aléatoires
+            val hue = Random.nextFloat() * 360f
+            val saturation = 1f
+            val brightness = 1f
+            paint.color = Color.HSVToColor(floatArrayOf(hue, saturation, brightness))
+
+            canvas.drawRect(0f, 0f, screenWidth, screenHeight, paint)
         }
 
         update()
@@ -276,6 +306,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 updateDeepOne()
                 updateTentacles()
             }
+            level == 5 -> updateColorOutOfSpace()
         }
 
         //explosion
@@ -288,7 +319,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         if (
             (level <= maxByakheeLevels && byakhees.isEmpty()) ||
             (level == 3 && dhole == null) ||
-            (level == 4 && deepOneScore >= deepOneScoreToWin)
+            (level == 4 && deepOneScore >= deepOneScoreToWin) ||
+            (level == 5 && colorOutOfSpaceDestroyed > colorOutOfSpaceScoreToWin)
         ) {
             startNextLevel()
         }
@@ -309,6 +341,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         level++
         speedMultiplier = 1f
         byakheesDestroyed = 0
+        deepOneScore = 0 // Réinitialiser le score des DeepOnes
+        colorOutOfSpaceDestroyed = 0 // Compteur de ColorOutOfSpace détruits
+
+        isTransitioning = true // Démarrer la transition
+        transitionAlpha = 255 // Réinitialiser l'alpha
+
 
         // Mettre à jour la barre de vie +1 ?
         playerGainLife()
@@ -321,6 +359,16 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         // Réinitialiser les balles
         bullets.clear()
+
+        // Réinitialiser les listes d'ennemis
+        byakhees.clear()
+        dhole = null // Réinitialiser le Dhole
+        deepOnes.clear()
+        deepOnes.forEach { it.ichorousBlasts.clear() } // Effacer les tirs de chaque DeepOne
+        colorOutOfSpaces.clear()
+
+        // Réinitialiser les tentacules
+        tentacles.clear()
 
         // Jouer un son de grésillement différent selon le niveau
         when  {
@@ -338,12 +386,26 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 createDhole()
                 background.switchBackground(Background.BackgroundType.DHOLE_REALM)
             }
-            else -> {
+            level == 4 -> {
                 createDeepOnes()
                 //deepOneScore = 0 // Réinitialiser le score DeepOne
                 background.switchBackground(Background.BackgroundType.RLYEH)
             }
+            else -> {
+                createColorOutOfSpace()
+                background.switchBackground(Background.BackgroundType.COLOUR_OUT_OF_SPACE)
+            }
         }
+
+        // Animer l'alpha avec un postDelayed
+        postDelayed({
+            // ... (code existant pour réinitialiser les éléments du niveau)
+
+            // Terminer la transition
+            isTransitioning = false
+            transitionAlpha = 0
+        }, 1000) // Durée de la transition en millisecondes (1 seconde
+
     }
 
     // Méthode à appeler pour libérer les ressources lorsque le jeu se termine ou est détruit
@@ -702,5 +764,65 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val tentacle = Tentacle(startX, startY, screenWidth / 2, direction)
         tentacles.add(tentacle)
     }
+
+    // Code spécifique aux ColorOutOfSpace
+    // Code spécifique aux ColorOutOfSpace
+    // Code spécifique aux ColorOutOfSpace
+    private fun createColorOutOfSpace() {
+        colorOutOfSpaces.clear()
+        for (i in 0 until 1) { // Commencez avec un ennemi
+            val x = Random.nextFloat() * (screenWidth - player.size * 3) + player.size * 1.5f
+            val y = Random.nextFloat() * (screenHeight - player.size * 3) + player.size * 1.5f
+            colorOutOfSpaces.add(ColorOutOfSpace(x, y, player, screenWidth.toInt(), screenHeight.toInt()))
+        }
+    }
+
+    private fun updateColorOutOfSpace() {
+        colorOutOfSpaces.forEach { it.move() }
+
+        val bulletsToRemove = mutableListOf<Bullet>()
+        val colorOutOfSpaceToRemove = mutableListOf<ColorOutOfSpace>()
+
+        // Vérifier les collisions des ColorOutOfSpace avec le joueur
+        for (colorOutOfSpace in colorOutOfSpaces) {
+            if (colorOutOfSpace.intersectsPlayer(player)) {
+                updatePlayerHealth()
+                colorOutOfSpaceToRemove.add(colorOutOfSpace)
+                createColorOutOfSpace()
+                break
+            }
+        }
+
+        // Vérifier les collisions des ColorOutOfSpace avec les balles
+        for (colorOutOfSpace in colorOutOfSpaces) {
+            for (bullet in bullets) {
+                if (colorOutOfSpace.intersectsBullet(bullet.x, bullet.y)) {
+                    if (colorOutOfSpace.hit()) {
+                        colorOutOfSpaceToRemove.add(colorOutOfSpace)
+                        createExplosion(colorOutOfSpace.x, colorOutOfSpace.y, colorOutOfSpace.size, colorOutOfSpace.size)
+                        colorOutOfSpaceDestroyed++
+                        if (colorOutOfSpaceDestroyed < colorOutOfSpaceScoreToWin) {
+                            createColorOutOfSpace() // Créer un nouveau ColorOutOfSpace
+                        } else {
+                            // Le joueur a gagné, passer au niveau suivant ou terminer le jeu
+                            startNextLevel()
+                        }
+                    }
+                    bulletsToRemove.add(bullet)
+                    break
+                }
+            }
+        }
+
+        colorOutOfSpaces.removeAll(colorOutOfSpaceToRemove)
+        bullets.removeAll(bulletsToRemove)
+
+        // Incrémenter le score et ajouter un score temporaire pour chaque ColorOutOfSpace détruit
+        colorOutOfSpaceToRemove.forEach {
+            score++
+            temporaryScores.add(TemporaryScore(it.x, it.y))
+        }
+    }
+
 
 }

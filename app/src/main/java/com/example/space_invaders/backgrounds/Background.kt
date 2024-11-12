@@ -23,7 +23,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
     enum class BackgroundType {
         COSMIC_HORROR_RUINS,
         DHOLE_REALM,
-        RLYEH
+        RLYEH,
+        COLOUR_OUT_OF_SPACE
         // Ajoutez d'autres types de fond ici au besoin
     }
 
@@ -37,6 +38,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COSMIC_HORROR_RUINS -> R.drawable.byakhee_horror_background
             BackgroundType.DHOLE_REALM -> R.drawable.dhole_realm_background
             BackgroundType.RLYEH -> R.drawable.rlyeh_background // Assurez-vous d'avoir cette image
+            BackgroundType.COLOUR_OUT_OF_SPACE -> R.drawable.color_out_of_space_background
 
         }
 
@@ -77,6 +79,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins()
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
             BackgroundType.RLYEH -> generateRlyehStructures()
+            BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
         }
     }
 
@@ -102,6 +105,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
 
     private fun generateDholeRealm() {
         // Implémentez la génération du décor pour le royaume des Dholes
+    }
+
+    private fun generateColorOutOfSpace() {
+        // Implémentez la génération du décor pour le monde de Color Out Of Space
     }
 
     // Redistribue les structures après le changement de fond
@@ -135,6 +142,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COSMIC_HORROR_RUINS -> drawByakheeRuins(canvas)
             BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
             BackgroundType.RLYEH -> drawRlyehStructures(canvas)
+            BackgroundType.COLOUR_OUT_OF_SPACE -> drawColourOutOfSpace(canvas)
         }
     }
 
@@ -159,6 +167,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
                 structure.draw(canvas)
             }
         }
+    }
+
+    private fun drawColourOutOfSpace(canvas: Canvas) {
+        drawStars(canvas)
     }
 
     private fun drawStars(canvas: Canvas) {

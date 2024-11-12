@@ -10,7 +10,10 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import com.example.space_invaders.entities.player.Player
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 import kotlin.random.Random
 
 class DeepOne(
@@ -46,6 +49,31 @@ class DeepOne(
         private set
     var screenHHeight = screenHeight
         private set
+
+    // Nouvelles variables pour les effets lovecraftiens
+    private var glowPhase = 0f
+    private var distortionPhase = 0f
+    // Cclasse Rune pour stocker des positions relatives
+    private data class Rune(
+        val symbol: String,
+        var offsetX: Float, // Position relative au DeepOne
+        var offsetY: Float, // Position relative au DeepOne
+        var alpha: Float
+    )
+    private val runeSymbols = listOf("𐀀", "𐀁", "𐀂", "𐀃", "𐀄")
+    private var activeRunes = mutableListOf<Rune>()
+
+    init {
+        // Initialiser les runes avec des positions relatives
+        repeat(5) {
+            activeRunes.add(Rune(
+                symbol = runeSymbols.random(),
+                offsetX = Random.nextFloat() * width - width/2, // Position relative au centre
+                offsetY = Random.nextFloat() * height - height/2, // Position relative au centre
+                alpha = 0f
+            ))
+        }
+    }
 
 
     // Mouvement
@@ -93,6 +121,25 @@ class DeepOne(
             verticalSpeed = Random.nextFloat() * 4f + 1f // Entre 1 et 5
             horizontalSpeed = Random.nextFloat() * 5f + 2f // Entre 2 et 7
         }
+
+        // Animation de l'aura mystique
+        glowPhase += 0.05f
+
+        // Mise à jour des runes avec des mouvements relatifs
+        activeRunes.forEach { rune ->
+            // Faire tourner les runes autour du DeepOne
+            val radius = hypot(rune.offsetX, rune.offsetY)
+            val currentAngle = atan2(rune.offsetY, rune.offsetX)
+            val newAngle = currentAngle + 0.02f // Vitesse de rotation
+
+            rune.offsetX = cos(newAngle) * radius + sin(glowPhase) * 10
+            rune.offsetY = sin(newAngle) * radius + cos(glowPhase) * 10
+            rune.alpha = (sin(glowPhase) + 1) / 2 * 255
+        }
+
+        // Effet de distorsion
+        distortionPhase += 0.02f
+
     }
 
     fun attackPlayer(player: Player) {
@@ -128,40 +175,138 @@ class DeepOne(
         return hitsToDestroy <= 0
     }
 
-    fun draw(canvas: Canvas, paint: Paint) {
-        val bodyColor = Color.rgb(0, 128, 0)
-        val bellyColor = Color.WHITE
-        val scaleColor = Color.rgb(0, 100, 0)
-        val eyeColor = Color.YELLOW
-        val pupilColor = Color.BLACK
-        val gillColor = Color.RED
+fun draw(canvas: Canvas, paint: Paint) {
+    // Dessin de l'aura mystique renforcée
+    paint.style = Paint.Style.FILL
 
-        // Corps verdâtre
-        drawBody(canvas, paint, bodyColor)
+    // Première couche d'aura (plus large et subtile)
+    val outerAuraShader = RadialGradient(
+        x + width / 2, y + height / 2,
+        width * 2f,
+        intArrayOf(
+            Color.argb(0, 0, 255, 255),
+            Color.argb(40, 0, 200, 200),
+            Color.argb(0, 0, 150, 150)
+        ),
+        floatArrayOf(0.3f, 0.6f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    paint.shader = outerAuraShader
+    canvas.drawCircle(x + width / 2, y + height / 2, width * 2f, paint)
 
-        // Ventre blanc
-        drawBelly(canvas, paint, bellyColor)
+    // Deuxième couche d'aura (plus intense et concentrée)
+    val innerAuraShader = RadialGradient(
+        x + width / 2, y + height / 2,
+        width * 1.5f,
+        intArrayOf(
+            Color.argb(100, 0, 255, 255),
+            Color.argb(80, 0, 200, 255),
+            Color.argb(0, 0, 150, 255)
+        ),
+        floatArrayOf(0.2f, 0.5f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    paint.shader = innerAuraShader
+    canvas.drawCircle(x + width / 2, y + height / 2, width * 1.5f, paint)
 
-        // Écailles sur le dos
-        drawScales(canvas, paint, scaleColor)
+    // Pulsation de l'aura
+    val pulseIntensity = (sin(glowPhase) + 1) / 2
+    val pulseAuraShader = RadialGradient(
+        x + width / 2, y + height / 2,
+        width * 1.2f,
+        intArrayOf(
+            Color.argb((100 * pulseIntensity).toInt(), 0, 255, 255),
+            Color.argb((60 * pulseIntensity).toInt(), 0, 200, 255),
+            Color.argb(0, 0, 150, 255)
+        ),
+        floatArrayOf(0.1f, 0.4f, 1f),
+        Shader.TileMode.CLAMP
+    )
+    paint.shader = pulseAuraShader
+    canvas.drawCircle(x + width / 2, y + height / 2, width * 1.2f * (0.8f + 0.2f * pulseIntensity), paint)
+    paint.shader = null
 
-        // Tête de poisson
-        drawHead(canvas, paint, bodyColor)
+    // Effet de distorsion de l'espace renforcé
+    val distortionPath = Path()
+    val distortionRadius = width * 2
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = 3f // Ligne plus épaisse
 
-        // Yeux et pupilles
-        drawEyes(canvas, paint, eyeColor, pupilColor)
+    for (angle in 0..360 step 15) {
+        val angleRad = Math.toRadians(angle.toDouble())
+        val distortion = sin(distortionPhase + angle / 30f) * 25 // Amplitude augmentée
+        val xPos = x + width / 2 + cos(angleRad) * (distortionRadius + distortion)
+        val yPos = y + height / 2 + sin(angleRad) * (distortionRadius + distortion)
 
-        // Ouïes
-        drawGills(canvas, paint, gillColor)
+        if (angle == 0) distortionPath.moveTo(xPos.toFloat(), yPos.toFloat())
+        else distortionPath.lineTo(xPos.toFloat(), yPos.toFloat())
+    }
+    distortionPath.close()
 
-        // Pattes palmées
-        drawLegs(canvas, paint, bodyColor)
+    // Double tracé pour l'effet de distorsion
+    paint.color = Color.argb(70, 0, 255, 255)
+    canvas.drawPath(distortionPath, paint)
+    paint.color = Color.argb(40, 255, 255, 255)
+    paint.strokeWidth = 1.5f
+    canvas.drawPath(distortionPath, paint)
 
-        //
-        ichorousBlasts.forEach { it.draw(canvas, paint) }
+    // Le reste du code de dessin du DeepOne...
+    val bodyColor = Color.rgb(0, 128, 0)
+    val bellyColor = Color.WHITE
+    val scaleColor = Color.rgb(0, 100, 0)
+    val eyeColor = Color.YELLOW
+    val pupilColor = Color.BLACK
+    val gillColor = Color.RED
 
-     }
+    // Corps verdâtre
+    drawBody(canvas, paint, bodyColor)
 
+    // Ventre blanc
+    drawBelly(canvas, paint, bellyColor)
+
+    // Écailles sur le dos
+    drawScales(canvas, paint, scaleColor)
+
+    // Tête de poisson
+    drawHead(canvas, paint, bodyColor)
+
+    // Yeux et pupilles
+    drawEyes(canvas, paint, eyeColor, pupilColor)
+
+    // Ouïes
+    drawGills(canvas, paint, gillColor)
+
+    // Pattes palmées
+    drawLegs(canvas, paint, bodyColor)
+
+    // Dessiner les runes mystiques avec plus d'intensité
+    paint.reset()
+    paint.textSize = 30f
+    activeRunes.forEach { rune ->
+        // Effet de lueur autour des runes
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb((rune.alpha * 0.3).toInt(), 0, 255, 255)
+        paint.strokeWidth = 8f
+        val runeX = x + width/2 + rune.offsetX
+        val runeY = y + height/2 + rune.offsetY
+
+        // Halo autour des runes
+        canvas.drawCircle(runeX, runeY, 20f, paint)
+
+        // Rune elle-même avec plus d'intensité
+        paint.alpha = rune.alpha.toInt()
+        paint.color = Color.rgb(100, 255, 255)
+        canvas.drawText(
+            rune.symbol,
+            runeX,
+            runeY,
+            paint
+        )
+    }
+
+    // Dessiner les projectiles
+    ichorousBlasts.forEach { it.draw(canvas, paint) }
+}
     private fun drawBody(canvas: Canvas, paint: Paint, color: Int) {
         paint.color = Color.LTGRAY
         //canvas.drawCircle(x + width / 2 , y + height / 2, 80f, paint)
