@@ -54,8 +54,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val byakhees = mutableListOf<Byakhee>()
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
-    private val maxByakheeLevels = 2 // Définissez le nombre de niveaux Byakhee souhaités
-    private val numByakheeRows = 3//1  //  lignes //ATTENTION
+    private val maxByakheeLevels = 12//4  Définissez le nombre de niveaux Byakhee souhaités
+    private val numByakheeRows = 1//1  //  lignes //ATTENTION
     private val numByakheeCols = 5//2
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
@@ -69,7 +69,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var lastSpawnTime: Long = 0
     private val spawnInterval: Long = 5000 // 5000 millisecondes = 5s
     private var deepOneScore = 0
-    private val deepOneScoreToWin = 70//7 // Nombre de DeepOnes à détruire pour gagner le niveau
+    // Nombre de DeepOnes à détruire pour gagner le niveau
+    private val deepOneScoreToWin = 70//7
     private var deepOnesDestroyed = 0
     //Tentacles Chtulhu
     private val tentacles = mutableListOf<Tentacle>()
@@ -83,9 +84,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // ColorOutOfSpace related variables
     private val colorOutOfSpaces = mutableListOf<ColorOutOfSpace>()
-    private val maxColorOutOfSpaceLevel = 5 // Définissez le niveau ColorOutOfSpace
+    //private val maxColorOutOfSpaceLevel = 5 // Définissez le niveau ColorOutOfSpace
     private var colorOutOfSpaceDestroyed = 0
-    private var colorOutOfSpaceScoreToWin = 100 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
+    private var colorOutOfSpaceScoreToWin = 100//3 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
 
 
     //Transition
@@ -170,7 +171,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         distortionPaint.color = Color.argb(100, 0, 255, 255)
 
         // Initialiser les ennemis ColorOutOfSpace
-        if (level == maxColorOutOfSpaceLevel) {
+        if (level == maxByakheeLevels + 3) {
             createColorOutOfSpace()
         }
     }
@@ -300,13 +301,13 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Mettre à jour les ennemis
         when {
             level <= maxByakheeLevels -> updateByakhee()
-            level == 3 -> updateDhole()
-            level == 4 -> { //R'lyeh level
+            level == (maxByakheeLevels + 1) -> updateDhole()  // avant 3
+            level == (maxByakheeLevels + 2) -> { //R'lyeh level (avant 4)
                 screenDistortionEffect.update()
                 updateDeepOne()
                 updateTentacles()
             }
-            level == 5 -> updateColorOutOfSpace()
+            level == (maxByakheeLevels + 3) -> updateColorOutOfSpace() // avant 5
         }
 
         //explosion
@@ -318,9 +319,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Vérifier si le niveau est terminé
         if (
             (level <= maxByakheeLevels && byakhees.isEmpty()) ||
-            (level == 3 && dhole == null) ||
-            (level == 4 && deepOneScore >= deepOneScoreToWin) ||
-            (level == 5 && colorOutOfSpaceDestroyed > colorOutOfSpaceScoreToWin)
+            (level == (maxByakheeLevels + 1) && dhole == null) ||
+            (level == (maxByakheeLevels + 2) && deepOneScore >= deepOneScoreToWin) ||
+            (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed > colorOutOfSpaceScoreToWin)
         ) {
             startNextLevel()
         }
@@ -382,11 +383,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 createByakhees()
                 background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
             }
-            level == 3 -> {
+            level == (maxByakheeLevels + 1) -> {
                 createDhole()
                 background.switchBackground(Background.BackgroundType.DHOLE_REALM)
             }
-            level == 4 -> {
+            level == (maxByakheeLevels + 2) -> {
                 createDeepOnes()
                 //deepOneScore = 0 // Réinitialiser le score DeepOne
                 background.switchBackground(Background.BackgroundType.RLYEH)
