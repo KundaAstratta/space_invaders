@@ -11,7 +11,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 class Byakhee(var x: Float, var y: Float, val width: Float, val height: Float, level: Int) {
-    var hitsToDestroy = 3 + level
+    var hitsToDestroy = 3 + level //5
     private var dx = Random.nextFloat() * 8 - 4 // Vitesse horizontale aléatoire entre -4 et 4
     private var dy = Random.nextFloat() * 8 - 4 // Vitesse verticale aléatoire entre -4 et 4
 
