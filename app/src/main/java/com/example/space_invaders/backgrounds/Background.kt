@@ -24,7 +24,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
         COSMIC_HORROR_RUINS,
         DHOLE_REALM,
         RLYEH,
-        COLOUR_OUT_OF_SPACE
+        COLOUR_OUT_OF_SPACE,
+        LUNAR_SPACE
         // Ajoutez d'autres types de fond ici au besoin
     }
 
@@ -39,7 +40,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.DHOLE_REALM -> R.drawable.dhole_realm_background
             BackgroundType.RLYEH -> R.drawable.rlyeh_background // Assurez-vous d'avoir cette image
             BackgroundType.COLOUR_OUT_OF_SPACE -> R.drawable.color_out_of_space_background
-
+            BackgroundType.LUNAR_SPACE -> R.drawable.lunar_background
         }
 
         val options = BitmapFactory.Options().apply {
@@ -80,6 +81,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
             BackgroundType.RLYEH -> generateRlyehStructures()
             BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
+            BackgroundType.LUNAR_SPACE -> generateLunarSpaceStructures()
         }
     }
 
@@ -109,6 +111,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
 
     private fun generateColorOutOfSpace() {
         // Implémentez la génération du décor pour le monde de Color Out Of Space
+    }
+
+    private fun generateLunarSpaceStructures() {
+        // Implémentez la génération du décor pour le monde de Lunar Space
     }
 
     // Redistribue les structures après le changement de fond
@@ -143,6 +149,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
             BackgroundType.RLYEH -> drawRlyehStructures(canvas)
             BackgroundType.COLOUR_OUT_OF_SPACE -> drawColourOutOfSpace(canvas)
+            BackgroundType.LUNAR_SPACE -> drawLunarSpaceStructures(canvas)
         }
     }
 
@@ -170,6 +177,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
     }
 
     private fun drawColourOutOfSpace(canvas: Canvas) {
+        drawStars(canvas)
+    }
+
+    private fun drawLunarSpaceStructures(canvas: Canvas) {
         drawStars(canvas)
     }
 
