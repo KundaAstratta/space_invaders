@@ -22,9 +22,12 @@ import com.example.space_invaders.entities.player.HealthBar
 import com.example.space_invaders.entities.player.Player
 import com.example.space_invaders.entities.player.ShootButton
 import com.example.space_invaders.entities.player.ShootDirection
+import com.example.space_invaders.entities.shoggoth.Shoggoth
 import com.example.space_invaders.game.activity.GameOverActivity
 import com.example.space_invaders.levels.rlyehLevel.ScreenDistortionEffect
+import com.example.space_invaders.levels.shoggothLevel.MazeSystem
 import kotlin.math.PI
+import kotlin.math.hypot
 import kotlin.random.Random
 
 class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
@@ -88,18 +91,22 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var colorOutOfSpaceDestroyed = 0
     private var colorOutOfSpaceScoreToWin = 100//3 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
 
+    // Shoggoth related variables
+    private val shoggoths = mutableListOf<Shoggoth>()
+    private var shoggothSize = 0f
+    private var shoggothScoreToWin = 5 //50 Nombre de Shoggoths à détruire
+    private var shoggothsDestroyed = 0
+    private lateinit var mazeSystem: MazeSystem
 
     //Transition
     private var transitionAlpha = 255 // Nouvelle variable pour l'alpha de la transition
     private var isTransitioning = false // Nouvelle variable pour indiquer si une transition est en cours
-
 
     // Variable globale pour le score
     private var score = 0
 
     //Health bar
     private lateinit var healthBar: HealthBar
-
 
     // Classe pour représenter un score temporaire
     data class TemporaryScore(
@@ -125,7 +132,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         tentaclePaint.strokeCap = Paint.Cap.ROUND
     }
 
-    //initialiser et adapter les éléments du jeu (comme le joueur, les ennemis,
+    // initialiser et adapter les éléments du jeu (comme le joueur, les ennemis,
     // et le fond d'écran) en fonction des dimensions de l'écran
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -145,7 +152,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Initialiser le fond d'écran
         background = Background(context, screenWidth, screenHeight)
 
-        // Initialiser les ennemis du niveau Byakhee
+        mazeSystem = MazeSystem(screenWidth, screenHeight)
+
+        // Initialiser les ennemis du premier niveau
         createByakhees()
 
         // Jouer un son de grésillement différent selon le niveau
@@ -170,10 +179,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         distortionPaint.style = Paint.Style.FILL
         distortionPaint.color = Color.argb(100, 0, 255, 255)
 
-        // Initialiser les ennemis ColorOutOfSpace
-        if (level == maxByakheeLevels + 3) {
-            createColorOutOfSpace()
-        }
     }
 
 
@@ -183,15 +188,40 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         background.draw(canvas)
 
+        // Dessiner le labyrinthe
+        if (level == maxByakheeLevels + 4) {
+            paint.color = Color.DKGRAY
+            mazeSystem.draw(canvas, paint)
+        }
+
         // Dessin normal du jeu
         if (player.isAlive) {
             player.draw(canvas, paint)
         }
-        byakhees.forEach { it.draw(canvas, paint) }
+
+        //level shoggoths begin
+        when {
+            level <= maxByakheeLevels -> {
+                byakhees.forEach { it.draw(canvas, paint) }
+            }
+            level == maxByakheeLevels + 1 -> {
+                dhole?.draw(canvas, paint)
+            }
+            level == maxByakheeLevels + 2 -> {
+                deepOnes.forEach { it.draw(canvas, paint) }
+                tentacles.forEach { it.draw(canvas, tentaclePaint) }
+            }
+            level == maxByakheeLevels + 3 -> {
+                colorOutOfSpaces.forEach { it.draw(canvas, paint) }
+            }
+            level == maxByakheeLevels + 4 -> {
+                // Nouveau rendu pour le niveau Arkham
+                shoggoths.forEach { it.draw(canvas) }
+            }
+        }
+        //level shooggoths end
+
         bullets.forEach { it.draw(canvas, paint) }
-        dhole?.draw(canvas, paint)
-        deepOnes.forEach { it.draw(canvas, paint) }
-        colorOutOfSpaces.forEach { it.draw(canvas, paint) }
 
         explosions.forEach { explosion ->
             explosion.forEach { it.draw(canvas, paint) }
@@ -211,8 +241,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Dessiner le bouton de tir
         shootButton.draw(canvas, paint)
 
-        // Dessiner les tentacules
-        tentacles.forEach { it.draw(canvas, tentaclePaint) }
 
         // Dessiner l'effet de distorsion s'il est actif
         if (screenDistortionEffect.isActive()) {
@@ -280,21 +308,28 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         bullets.forEach { it.move() }
 
-        // Vérification des collisions des bullets avec les structures
-
-        val bulletsToRemove = mutableListOf<Bullet>()  // Créer une liste temporaire pour les bullets à supprimer
-
-        bullets.forEach { bullet ->
-            // Vérifier les collisions avec les structures
-            if (background.structures.any { structure ->
-                    structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.maxRadius * 2)
-                }) {
-                bulletsToRemove.add(bullet)  // Ajouter la bullet à la liste des bullets à supprimer
+        // Pour le niveau Shoggoth, vérifier les collisions avec les murs du labyrinthe
+        if (level == maxByakheeLevels + 4) {
+            val bulletsToRemove = mutableListOf<Bullet>()
+            bullets.forEach { bullet ->
+                if (mazeSystem.checkBulletCollision(bullet.x, bullet.y)) {
+                    bulletsToRemove.add(bullet)
+                }
             }
+            bullets.removeAll(bulletsToRemove)
+        } else {
+            // Vérification des collisions avec les structures existantes
+            val bulletsToRemove = mutableListOf<Bullet>()
+            bullets.forEach { bullet ->
+                if (background.structures.any { structure ->
+                        structure.intersectsBulletVersusStruct(bullet.x, bullet.y, bullet.maxRadius * 2)
+                    }) {
+                    bulletsToRemove.add(bullet)
+                }
+            }
+            bullets.removeAll(bulletsToRemove)
         }
 
-        // Supprimer les bullets qui ont touché une structure
-        bullets.removeAll(bulletsToRemove)
         // Supprimer les balles hors de l'écran
         bullets.removeAll { it.y < 0 }
 
@@ -307,7 +342,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 updateDeepOne()
                 updateTentacles()
             }
-            level == (maxByakheeLevels + 3) -> updateColorOutOfSpace() // avant 5
+            level == (maxByakheeLevels + 3) -> {// avant 5
+                updateColorOutOfSpace()
+                screenDistortionEffect.stop() //  Au cas ou l'effet de distortion n'est pas stoppé
+            }
+            level == (maxByakheeLevels + 4) -> updateShoggoth()
+
         }
 
         //explosion
@@ -321,7 +361,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             (level <= maxByakheeLevels && byakhees.isEmpty()) ||
             (level == (maxByakheeLevels + 1) && dhole == null) ||
             (level == (maxByakheeLevels + 2) && deepOneScore >= deepOneScoreToWin) ||
-            (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed > colorOutOfSpaceScoreToWin)
+            (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed >= colorOutOfSpaceScoreToWin) ||
+            (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin)
         ) {
             startNextLevel()
         }
@@ -392,10 +433,21 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 //deepOneScore = 0 // Réinitialiser le score DeepOne
                 background.switchBackground(Background.BackgroundType.RLYEH)
             }
-            else -> {
+            level == (maxByakheeLevels + 3) -> {
+                screenDistortionEffect.stop() //  Au cas ou l'effet de distortion n'est pas stoppé
                 createColorOutOfSpace()
                 background.switchBackground(Background.BackgroundType.COLOUR_OUT_OF_SPACE)
             }
+            level == (maxByakheeLevels + 4) -> {
+                createShoggoth()
+                background.switchBackground(Background.BackgroundType.LUNAR_SPACE)
+
+                // Placer le joueur dans un corridor aléatoire
+                val (playerX, playerY) = mazeSystem.getRandomCorridorPosition()
+                player.x = playerX
+                player.y = playerY
+            }
+
         }
 
         // Animer l'alpha avec un postDelayed
@@ -440,7 +492,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                     val newY = event.y + touchOffsetY
                     lastDeltaX = newX - player.x
                     lastDeltaY = newY - player.y
-                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures)
+
+                    val mazeSystemForLevel = if (level == maxByakheeLevels + 4) mazeSystem else null
+
+                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures,mazeSystemForLevel)
                 }
             }
 
@@ -476,7 +531,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             ShootDirection.LEFT -> Pair(-bulletSpeed, 0f)
             ShootDirection.RIGHT -> Pair(bulletSpeed, 0f)
         }
-        bullets.add(Bullet(player.x, player.y, bulletVelocity.first, bulletVelocity.second))
+        //bullets.add(Bullet(player.x, player.y, bulletVelocity.first, bulletVelocity.second))
+        val newBullet = Bullet(player.x, player.y, bulletVelocity.first, bulletVelocity.second)
+
+        // Check bullet collision only in Shoggoth level
+        if (level == maxByakheeLevels + 4) {
+            if (!mazeSystem.checkBulletCollision(newBullet.x, newBullet.y)) {
+                bullets.add(newBullet)
+            }
+        } else {
+            bullets.add(newBullet)
+        }
     }
 
     fun dpToPx(context: Context, dp: Float): Float {
@@ -759,8 +824,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     private fun spawnTentacle() {
-        val startX = Random.nextFloat() * screenWidth
-        val startY = Random.nextFloat() * screenHeight
+        val startX = Random.nextFloat() * (screenWidth - 30)
+        val startY = Random.nextFloat() * (screenHeight - 30)
         val direction = Random.nextFloat() * 2 * PI.toFloat()
         val tentacle = Tentacle(startX, startY, screenWidth / 2, direction)
         tentacles.add(tentacle)
@@ -825,5 +890,122 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
     }
 
+    //Code spécifique aux Shoggoth
+    //Code spécifique aux Shoggoth
+    //Code spécifique aux Shoggoth
+
+    private fun createShoggoth() {
+        shoggoths.clear()
+        shoggothSize = screenWidth / 8
+
+        while (shoggoths.size < 1) { //3
+            val (x, y) = mazeSystem.getRandomCorridorPosition()
+            //val shoggothSize = screenWidth / 8
+            val newShoggoth = Shoggoth(x, y, shoggothSize,screenWidth,screenHeight)
+
+            // Vérifier si le nouveau Shoggoth chevauche le joueur ou les Shoggoths existants
+
+            if (player.intersectsShoggoth(newShoggoth) || shoggoths.any { it.intersectsShoggoth(newShoggoth) }) {
+                continue // Réessayer s'il y a chevauchement
+            }
+
+            shoggoths.add(newShoggoth)
+
+        }
+
+    }
+
+    private fun updateShoggoth() {
+        val shoggothsToRemove = mutableListOf<Shoggoth>()
+
+        for (shoggoth in shoggoths) {
+            // Déplacer le Shoggoth
+            shoggoth.move() // Assurez-vous que Shoggoth.kt a la méthode move(mazeSystem: MazeSystem)
+
+            // Vérifier les collisions avec les balles
+            for (bullet in bullets) {
+                if (shoggoth.intersectsBullet(bullet.x, bullet.y)) {
+                    if (shoggoth.hit()) {
+                        shoggothsToRemove.add(shoggoth)
+                        createExplosion(shoggoth.x, shoggoth.y, shoggoth.initialSize, shoggoth.initialSize)
+
+                        score++
+                        shoggothsDestroyed++
+
+                        temporaryScores.add(TemporaryScore(shoggoth.x + shoggoth.initialSize / 2, shoggoth.y + shoggoth.initialSize / 2))
+
+                        // Faire réapparaître un nouveau Shoggoth dans une case vide
+                        // spawnShoggoth()
+
+                        // Vérifier si 3 Shoggoths ont été détruits
+                        // Si oui, reinitialiser le labyrinthe et repositionner le joueur et les shoggoths
+                        if (shoggothsDestroyed % 2 == 0) { //3
+                            // Réinitialiser le labyrinthe
+                            mazeSystem = MazeSystem(screenWidth, screenHeight)
+
+                            // Repositionner le joueur dans un nouveau corridor
+                            val (playerX, playerY) = mazeSystem.getRandomCorridorPosition()
+                            player.x = playerX
+                            player.y = playerY
+
+                            // Supprimer les Shoggoths restants
+                            shoggoths.clear()
+
+                            // Recréer de nouveaux Shoggoths dans le nouveau labyrinthe
+                            while (shoggoths.size < 1) { //3
+                                spawnShoggoth()
+                            }
+                        }
+
+                    }
+                    bullets.remove(bullet)
+                    break // Sortir de la boucle des balles après une collision
+                }
+            }
+
+            // Vérifier la collision avec le joueur
+            if (player.intersectsShoggoth(shoggoth)) {
+                updatePlayerHealth()
+                // Vous pouvez également envisager de faire réapparaître le Shoggoth ici ou d'ajouter un effet de recul
+                break // Sortir de la boucle des Shoggoths après une collision avec le joueur
+            }
+
+        }
+
+        shoggoths.removeAll(shoggothsToRemove)
+
+        // Maintenir toujours 3 Shoggoths à l'écran
+        while (shoggoths.size < 1) { //3
+            spawnShoggoth()
+        }
+
+    }
+
+    private fun spawnShoggoth() {
+        var maxAttempts = 10
+        while (maxAttempts > 0) {
+            val (x, y) = mazeSystem.getRandomCorridorPosition()
+            val newShoggoth = Shoggoth(x, y, shoggothSize, screenWidth, screenHeight)
+
+            // Vérifier si le nouveau Shoggoth ne chevauche pas le joueur ou les Shoggoths existants
+            if (!player.intersectsShoggoth(newShoggoth) && shoggoths.none { it.intersectsShoggoth(newShoggoth) }) {
+                shoggoths.add(newShoggoth)
+                return
+            }
+            maxAttempts--
+        }
+    }
+
+    // Ajouter la méthode d'extension pour la collision shoggoth-shoggoth
+    private fun Shoggoth.intersectsShoggoth(other: Shoggoth): Boolean {
+        val distance = hypot(x - other.x, y - other.y)
+        return distance < (initialSize / 2 + other.initialSize / 2)
+    }
+
+    // Ajouter la méthode d'extension pour la collision joueur-shoggoth
+    private fun Player.intersectsShoggoth(shoggoth: Shoggoth): Boolean {
+        val distance = kotlin.math.hypot(x - shoggoth.x, y - shoggoth.y)
+        return distance < (size / 2 + shoggoth.initialSize / 2)
+    }
 
 }

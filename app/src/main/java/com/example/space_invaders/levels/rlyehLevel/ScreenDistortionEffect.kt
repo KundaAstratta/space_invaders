@@ -17,6 +17,10 @@ class ScreenDistortionEffect(private val screenWidth: Float, private val screenH
         startTime = System.currentTimeMillis()
     }
 
+    fun stop() {
+        isActive = false
+    }
+
     fun update() {
         if (isActive && System.currentTimeMillis() - startTime > duration) {
             isActive = false
