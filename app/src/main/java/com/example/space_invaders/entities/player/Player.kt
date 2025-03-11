@@ -8,6 +8,7 @@ import com.example.space_invaders.entities.ExplosionParticle
 import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.deepone.IchorousBlast
+import com.example.space_invaders.levels.shoggothLevel.MazeSystem
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -15,7 +16,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 class Player(var x: Float, var y: Float, val size: Float) {
-    var lives = 100//20
+    var lives = 200//20
     var isAlive = true
     private var lifeLossAnimation: LifeLossAnimation? = null
 
@@ -32,7 +33,7 @@ class Player(var x: Float, var y: Float, val size: Float) {
             else -> Color.GREEN
         }
 
-        // Dessiner la soucoupe volante (corps principal)
+        // Dessiner le corps principal
 
         val saucerRadius = size / 2
 
@@ -83,23 +84,40 @@ class Player(var x: Float, var y: Float, val size: Float) {
 
     }
 
-    fun moveTo(newX: Float, newY: Float, screenWidth: Float, screenHeight: Float, structures: List<Background.Structure>) {
+    fun moveTo(
+        newX: Float,
+        newY: Float,
+        screenWidth: Float,
+        screenHeight: Float,
+        structures: List<Background.Structure>,
+        mazeSystem: MazeSystem? = null
+    ) {
+        var finalX = newX.coerceIn(size / 2, screenWidth - size / 2)
+        var finalY = newY.coerceIn(size / 2, screenHeight - size / 2)
 
-        val potentialX = newX.coerceIn(size / 2, screenWidth - size / 2)
-        val potentialY = newY.coerceIn(size / 2, screenHeight - size / 2)
+        // If in Shoggoth level with maze system, use maze-specific movement
+        if (mazeSystem != null) {
+            val movement = mazeSystem.getValidMovement(x, y, finalX, finalY, size / 2)
+            finalX = movement.first
+            finalY = movement.second
+        } else {
+            // Original structure collision check
+            var canMove = true
+            for (structure in structures) {
+                if (structure.intersectsPlayerVersusStruct(finalX, finalY, size)) {
+                    canMove = false
+                    break
+                }
+            }
 
-        var canMove = true
-        for (structure in structures) {
-            if (structure.intersectsPlayerVersusStruct(potentialX, potentialY, size)) {
-                canMove = false
-                break
+            if (!canMove) {
+                return
             }
         }
 
-        if (canMove) {
-            x = potentialX
-            y = potentialY
-        }
+        x = finalX
+        y = finalY
+        //++++
     }
 
     fun hit(): Boolean {
