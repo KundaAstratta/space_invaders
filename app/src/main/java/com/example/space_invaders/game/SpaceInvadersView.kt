@@ -94,7 +94,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Shoggoth related variables
     private val shoggoths = mutableListOf<Shoggoth>()
     private var shoggothSize = 0f
-    private var shoggothScoreToWin = 5 //50 Nombre de Shoggoths à détruire
+    private var shoggothScoreToWin = 50 //5 Nombre de Shoggoths à détruire
     private var shoggothsDestroyed = 0
     private lateinit var mazeSystem: MazeSystem
 
