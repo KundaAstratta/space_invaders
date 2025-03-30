@@ -6,12 +6,14 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
-import android.graphics.RectF
 import android.graphics.Shader
 import com.example.space_invaders.R
-import com.example.space_invaders.entities.deepone.DeepOne
+import com.example.space_invaders.utils.Enums.BackgroundType
+import com.example.space_invaders.levels.rlyehLevel.CyclopeanStructure
+import com.example.space_invaders.levels.elderthingLevel.IceMountain
+import com.example.space_invaders.levels.elderthingLevel.ResearchStation
+import com.example.space_invaders.levels.elderthingLevel.Snowflake
 import kotlin.random.Random
 
 class Background(private val context: Context, private val screenWidth: Float, private val screenHeight: Float) {
@@ -19,28 +21,27 @@ class Background(private val context: Context, private val screenWidth: Float, p
     val structures = mutableListOf<Structure>()
     var backgroundType = BackgroundType.COSMIC_HORROR_RUINS
     private var backgroundBitmap: Bitmap? = null
+    private val snowflakes = mutableListOf<Snowflake>()
 
-    enum class BackgroundType {
-        COSMIC_HORROR_RUINS,
-        DHOLE_REALM,
-        RLYEH,
-        COLOUR_OUT_OF_SPACE,
-        LUNAR_SPACE
-        // Ajoutez d'autres types de fond ici au besoin
-    }
+
 
     init {
         loadBackgroundImage()
         generateStructures()
+        if (backgroundType == BackgroundType.ANTARTIC) {
+            generateSnowflakes()
+        }
     }
 
     private fun loadBackgroundImage() {
         val resourceId = when (backgroundType) {
+            BackgroundType.DEFAULT -> R.drawable.byakhee_horror_background
             BackgroundType.COSMIC_HORROR_RUINS -> R.drawable.byakhee_horror_background
             BackgroundType.DHOLE_REALM -> R.drawable.dhole_realm_background
-            BackgroundType.RLYEH -> R.drawable.rlyeh_background // Assurez-vous d'avoir cette image
+            BackgroundType.RLYEH -> R.drawable.rlyeh_background
             BackgroundType.COLOUR_OUT_OF_SPACE -> R.drawable.color_out_of_space_background
             BackgroundType.LUNAR_SPACE -> R.drawable.lunar_background
+            BackgroundType.ANTARTIC -> R.drawable.antartic_background
         }
 
         val options = BitmapFactory.Options().apply {
@@ -77,11 +78,13 @@ class Background(private val context: Context, private val screenWidth: Float, p
     private fun generateStructures() {
         structures.clear()
         when (backgroundType) {
+            BackgroundType.DEFAULT -> generateDefault()
             BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins()
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
             BackgroundType.RLYEH -> generateRlyehStructures()
             BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
             BackgroundType.LUNAR_SPACE -> generateLunarSpaceStructures()
+            BackgroundType.ANTARTIC -> generateAntarticStructures()
         }
     }
 
@@ -105,6 +108,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
     }
 
+    private fun generateDefault() {
+        // Implémentez la génération du décor pour le royaume des Dholes
+    }
+
     private fun generateDholeRealm() {
         // Implémentez la génération du décor pour le royaume des Dholes
     }
@@ -122,7 +129,15 @@ class Background(private val context: Context, private val screenWidth: Float, p
         structures.clear()
         when (backgroundType) {
             BackgroundType.RLYEH -> generateRlyehStructures()
+            BackgroundType.ANTARTIC -> generateAntarticStructures()
             else -> {} // Ne rien faire pour les autres types de fond
+        }
+
+        // Générer des flocons si on est en Antarctique
+        if (backgroundType == BackgroundType.ANTARTIC) {
+            generateSnowflakes()
+        } else {
+            snowflakes.clear()
         }
     }
 
@@ -138,6 +153,38 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
     }
 
+    private fun generateAntarticStructures() {
+        // Générer des montagnes glacées
+        for (i in 0..5) {
+            val mountainWidth = screenWidth * (0.2f + Random.nextFloat() * 0.3f)
+            val mountainHeight = screenHeight * (0.1f + Random.nextFloat() * 0.2f)
+            val posX = Random.nextFloat() * screenWidth
+            val posY = screenHeight - mountainHeight - (Random.nextFloat() * screenHeight * 0.1f)
+            structures.add(IceMountain(posX, posY, mountainWidth, mountainHeight))
+        }
+
+        // Générer des stations de recherche abandonnées
+        for (i in 0..3) {
+            val stationSize = screenWidth.coerceAtMost(screenHeight) * (0.05f + Random.nextFloat() * 0.1f)
+            val centerX = Random.nextFloat() * screenWidth
+            val centerY = screenHeight * (0.5f + Random.nextFloat() * 0.4f)
+            structures.add(ResearchStation(centerX, centerY, stationSize))
+        }
+    }
+
+    private fun generateSnowflakes() {
+        snowflakes.clear()
+        // Créer 200 flocons de neige avec différentes tailles et vitesses
+        for (i in 0..200) {
+            val size = 1f + Random.nextFloat() * 4f
+            val x = Random.nextFloat() * screenWidth
+            val y = Random.nextFloat() * screenHeight
+            val speed = 1f + Random.nextFloat() * 3f
+            val swayFactor = 0.2f + Random.nextFloat() * 0.8f
+            snowflakes.add(Snowflake(x, y, size, speed, swayFactor,screenWidth))
+        }
+    }
+
     fun draw(canvas: Canvas) {
         // Dessiner l'image de fond
         backgroundBitmap?.let { bitmap ->
@@ -145,11 +192,13 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
 
         when (backgroundType) {
+            BackgroundType.DEFAULT -> drawColourDefault(canvas)
             BackgroundType.COSMIC_HORROR_RUINS -> drawByakheeRuins(canvas)
             BackgroundType.DHOLE_REALM -> drawDholeRealm(canvas)
             BackgroundType.RLYEH -> drawRlyehStructures(canvas)
             BackgroundType.COLOUR_OUT_OF_SPACE -> drawColourOutOfSpace(canvas)
             BackgroundType.LUNAR_SPACE -> drawLunarSpaceStructures(canvas)
+            BackgroundType.ANTARTIC -> drawAntarticStructures(canvas)
         }
     }
 
@@ -160,6 +209,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
         for (structure in structures) {
             structure.draw(canvas)
         }
+    }
+
+    private fun drawColourDefault(canvas: Canvas) {
+        drawStars(canvas)
     }
 
     private fun drawDholeRealm(canvas: Canvas) {
@@ -184,6 +237,16 @@ class Background(private val context: Context, private val screenWidth: Float, p
         drawStars(canvas)
     }
 
+    private fun drawAntarticStructures(canvas: Canvas) {
+        // Dessiner les structures de l'Antarctique
+        for (structure in structures) {
+            structure.draw(canvas)
+        }
+
+        // Animer et dessiner les flocons de neige
+        updateAndDrawSnowflakes(canvas)
+    }
+
     private fun drawStars(canvas: Canvas) {
         paint.color = Color.WHITE
         for (i in 0..200) {
@@ -193,13 +256,50 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
     }
 
+    private fun updateAndDrawSnowflakes(canvas: Canvas) {
+        //paint.color = Color.WHITE
+        for (snowflake in snowflakes) {
+            // Mettre à jour la position
+            snowflake.update()
+
+            // Dessiner d'abord un halo diffus (effet de lueur verdâtre)
+            paint.color = snowflake.color
+            paint.alpha = snowflake.alpha / 3  // Halo plus transparent
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(snowflake.x, snowflake.y, snowflake.glowSize, paint)
+
+            // Dessiner ensuite le flocon plus brillant
+            paint.alpha = snowflake.alpha
+
+            // Dessiner le flocon
+            canvas.drawCircle(snowflake.x, snowflake.y, snowflake.size, paint)
+
+            // Si le flocon sort de l'écran, le replacer en haut
+            if (snowflake.y > screenHeight) {
+                snowflake.y = 0f
+                snowflake.x = Random.nextFloat() * screenWidth
+            }
+        }
+    }
+
     fun switchBackground(newType: BackgroundType) {
         backgroundType = newType
         loadBackgroundImage()
         generateStructures()
+
+        // Générer des flocons si on passe en mode Antarctique
+        if (backgroundType == BackgroundType.ANTARTIC) {
+            generateSnowflakes()
+        } else {
+            snowflakes.clear()
+        }
     }
 
-    open inner class Structure(val centerX: Float, val centerY: Float, val radius: Float) {
+    open class Structure(
+        val centerX: Float,
+        val centerY: Float,
+        val radius: Float
+    ) {
         private val gradientPaint = Paint()
         private val gradient: RadialGradient
         private val whitePaint = Paint().apply {
@@ -257,39 +357,4 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
     }
 
-    inner class CyclopeanStructure(centerX: Float, centerY: Float, val size: Float) : Structure(centerX, centerY, size / 2) {
-        private val path = Path()
-        private val color = Color.argb(150, Random.nextInt(100, 200), Random.nextInt(100, 200), Random.nextInt(100, 200))
-
-        init {
-            path.moveTo(centerX, centerY - size / 2)
-            val numPoints = Random.nextInt(5, 8)
-            for (i in 1..numPoints) {
-                val angle = i * (2 * Math.PI / numPoints)
-                val radius = size / 2 * (0.5f + Random.nextFloat() * 0.5f)
-                val px = centerX + (radius * Math.cos(angle)).toFloat()
-                val py = centerY + (radius * Math.sin(angle)).toFloat()
-                path.lineTo(px, py)
-            }
-            path.close()
-        }
-
-        override fun draw(canvas: Canvas) {
-            paint.color = color
-            paint.style = Paint.Style.FILL
-            canvas.drawPath(path, paint)
-
-            paint.color = Color.BLACK
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2f
-            canvas.drawPath(path, paint)
-        }
-
-        fun intersectsDeepOneVsStruct(entity: DeepOne): Boolean {
-            val entityRect = RectF(entity.x, entity.y, entity.x + entity.width, entity.y + entity.height)
-            val structureBounds = RectF()
-            path.computeBounds(structureBounds, true)
-            return RectF.intersects(entityRect, structureBounds)
-        }
-    }
 }
