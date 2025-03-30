@@ -18,14 +18,19 @@ import com.example.space_invaders.entities.coloroutofspace.ColorOutOfSpace
 import com.example.space_invaders.entities.cthulhu.Tentacle
 import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.dhole.Dhole
+import com.example.space_invaders.entities.elderthing.ElderProjectile
+import com.example.space_invaders.entities.elderthing.ElderThing
 import com.example.space_invaders.entities.player.HealthBar
 import com.example.space_invaders.entities.player.Player
 import com.example.space_invaders.entities.player.ShootButton
 import com.example.space_invaders.entities.player.ShootDirection
 import com.example.space_invaders.entities.shoggoth.Shoggoth
 import com.example.space_invaders.game.activity.GameOverActivity
+import com.example.space_invaders.levels.rlyehLevel.CyclopeanStructure
 import com.example.space_invaders.levels.rlyehLevel.ScreenDistortionEffect
 import com.example.space_invaders.levels.shoggothLevel.MazeSystem
+import com.example.space_invaders.utils.Enums.BackgroundType
+
 import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.random.Random
@@ -57,7 +62,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val byakhees = mutableListOf<Byakhee>()
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
-    private val maxByakheeLevels = 12//4  Définissez le nombre de niveaux Byakhee souhaités
+    private val maxByakheeLevels = 1// 12  Définissez le nombre de niveaux Byakhee souhaités
     private val numByakheeRows = 1//1  //  lignes //ATTENTION
     private val numByakheeCols = 5//2
     private val byakheePadding = 10f
@@ -73,7 +78,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val spawnInterval: Long = 5000 // 5000 millisecondes = 5s
     private var deepOneScore = 0
     // Nombre de DeepOnes à détruire pour gagner le niveau
-    private val deepOneScoreToWin = 70//7
+    private val deepOneScoreToWin = 7//70
     private var deepOnesDestroyed = 0
     //Tentacles Chtulhu
     private val tentacles = mutableListOf<Tentacle>()
@@ -89,14 +94,20 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val colorOutOfSpaces = mutableListOf<ColorOutOfSpace>()
     //private val maxColorOutOfSpaceLevel = 5 // Définissez le niveau ColorOutOfSpace
     private var colorOutOfSpaceDestroyed = 0
-    private var colorOutOfSpaceScoreToWin = 100//3 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
+    private var colorOutOfSpaceScoreToWin = 3//100 //Nombre de ColorOutOgSapce à détruire pour gagner le niveau
 
     // Shoggoth related variables
     private val shoggoths = mutableListOf<Shoggoth>()
     private var shoggothSize = 0f
-    private var shoggothScoreToWin = 50 //5 Nombre de Shoggoths à détruire
+    private var shoggothScoreToWin = 2// 50  Nombre de Shoggoths à détruire
     private var shoggothsDestroyed = 0
     private lateinit var mazeSystem: MazeSystem
+
+    // Ajouter ces variables pour le niveau Elder Thing
+    private val elderThings = mutableListOf<ElderThing>()
+    private var elderThingSize = 0f
+    private var elderThingScoreToWin = 10 // 100 Nombre d'Elder Things à détruire
+    private var elderThingsDestroyed = 0
 
     //Transition
     private var transitionAlpha = 255 // Nouvelle variable pour l'alpha de la transition
@@ -156,6 +167,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
         // Initialiser les ennemis du premier niveau
         createByakhees()
+
+        elderThingSize = screenWidth / 7
 
         // Jouer un son de grésillement différent selon le niveau
         soundManager.playSound(R.raw.tv_static)
@@ -217,6 +230,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             level == maxByakheeLevels + 4 -> {
                 // Nouveau rendu pour le niveau Arkham
                 shoggoths.forEach { it.draw(canvas) }
+            }
+            level == (maxByakheeLevels + 5) -> {
+                // Dessiner les Elder Things
+                elderThings.forEach { it.draw(canvas, paint) }
             }
         }
         //level shooggoths end
@@ -347,7 +364,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 screenDistortionEffect.stop() //  Au cas ou l'effet de distortion n'est pas stoppé
             }
             level == (maxByakheeLevels + 4) -> updateShoggoth()
-
+            level == (maxByakheeLevels + 5) -> updateElderThing()
         }
 
         //explosion
@@ -362,7 +379,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             (level == (maxByakheeLevels + 1) && dhole == null) ||
             (level == (maxByakheeLevels + 2) && deepOneScore >= deepOneScoreToWin) ||
             (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed >= colorOutOfSpaceScoreToWin) ||
-            (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin)
+            (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin) ||
+            (level == (maxByakheeLevels + 5) && elderThingsDestroyed >= elderThingScoreToWin)
         ) {
             startNextLevel()
         }
@@ -385,6 +403,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         byakheesDestroyed = 0
         deepOneScore = 0 // Réinitialiser le score des DeepOnes
         colorOutOfSpaceDestroyed = 0 // Compteur de ColorOutOfSpace détruits
+        shoggothsDestroyed = 0 // Compteur de Shoggoths détruits
+        elderThingsDestroyed = 0 // Réinitialiser le compteur d'Elder Things détruits
 
         isTransitioning = true // Démarrer la transition
         transitionAlpha = 255 // Réinitialiser l'alpha
@@ -422,32 +442,36 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         when {
             level <= maxByakheeLevels -> {
                 createByakhees()
-                background.switchBackground(Background.BackgroundType.COSMIC_HORROR_RUINS)
+                background.switchBackground(BackgroundType.COSMIC_HORROR_RUINS)
             }
             level == (maxByakheeLevels + 1) -> {
                 createDhole()
-                background.switchBackground(Background.BackgroundType.DHOLE_REALM)
+                background.switchBackground(BackgroundType.DHOLE_REALM)
             }
             level == (maxByakheeLevels + 2) -> {
                 createDeepOnes()
                 //deepOneScore = 0 // Réinitialiser le score DeepOne
-                background.switchBackground(Background.BackgroundType.RLYEH)
+                background.switchBackground(BackgroundType.RLYEH)
             }
             level == (maxByakheeLevels + 3) -> {
                 screenDistortionEffect.stop() //  Au cas ou l'effet de distortion n'est pas stoppé
                 createColorOutOfSpace()
-                background.switchBackground(Background.BackgroundType.COLOUR_OUT_OF_SPACE)
+                background.switchBackground(BackgroundType.COLOUR_OUT_OF_SPACE)
             }
             level == (maxByakheeLevels + 4) -> {
                 createShoggoth()
-                background.switchBackground(Background.BackgroundType.LUNAR_SPACE)
+                background.switchBackground(BackgroundType.LUNAR_SPACE)
 
                 // Placer le joueur dans un corridor aléatoire
                 val (playerX, playerY) = mazeSystem.getRandomCorridorPosition()
                 player.x = playerX
                 player.y = playerY
             }
-
+            level == (maxByakheeLevels + 5) -> {
+                createElderThings()
+                //background.switchBackground(Background.BackgroundType.COLOUR_OUT_OF_SPACE) // Nous ajouterons ce type plus tard
+                background.switchBackground(BackgroundType.ANTARTIC) // Nous ajouterons ce type plus tard
+            }
         }
 
         // Animer l'alpha avec un postDelayed
@@ -495,7 +519,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
                     val mazeSystemForLevel = if (level == maxByakheeLevels + 4) mazeSystem else null
 
-                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures,mazeSystemForLevel)
+                    player.moveTo(newX, newY, screenWidth, screenHeight, background.structures,mazeSystemForLevel,
+                        background.backgroundType
+                    )
                 }
             }
 
@@ -718,8 +744,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             deepOne.attackPlayer(player) // Attaque du joueur toutes les 15 secondes
 
             // Vérifier si le DeepOne touche une structure cyclopéenne
-            if (background.backgroundType == Background.BackgroundType.RLYEH) {
-                val cyclopeanStructures = background.structures.filterIsInstance<Background.CyclopeanStructure>()
+            if (background.backgroundType == BackgroundType.RLYEH) {
+                val cyclopeanStructures = background.structures.filterIsInstance<CyclopeanStructure>()
                 for (structure in cyclopeanStructures) {
                     if (structure.intersectsDeepOneVsStruct(deepOne)) {
                         // Faire disparaître le DeepOne et le faire réapparaître près d'une autre structure au hasard
@@ -1007,5 +1033,90 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val distance = kotlin.math.hypot(x - shoggoth.x, y - shoggoth.y)
         return distance < (size / 2 + shoggoth.initialSize / 2)
     }
+
+    //Code spécifique aux Elder Things
+    //Code spécifique aux Elder Things
+    //Code spécifique aux Elder Things
+
+    // Ajouter les méthodes pour le niveau Elder Thing
+    private fun createElderThings() {
+        elderThings.clear()
+
+        // Créer plusieurs Elder Things répartis sur l'écran
+        for (i in 0 until 5) {
+            val x = Random.nextFloat() * (screenWidth - elderThingSize) + elderThingSize / 2
+            val y = Random.nextFloat() * (screenHeight / 2) + elderThingSize / 2
+            elderThings.add(ElderThing(x, y, elderThingSize, screenWidth, screenHeight))
+        }
+    }
+
+    private fun updateElderThing() {
+        // Mettre à jour les Elder Things
+        elderThings.forEach { it.move() }
+
+        val bulletsToRemove = mutableListOf<Bullet>()
+        val elderThingsToRemove = mutableListOf<ElderThing>()
+
+        // Vérifier les collisions avec les balles
+        for (elderThing in elderThings) {
+            for (bullet in bullets) {
+                if (elderThing.intersectsBullet(bullet.x, bullet.y)) {
+                    if (elderThing.hit()) {
+                        elderThingsToRemove.add(elderThing)
+                        createExplosion(elderThing.x, elderThing.y, elderThing.size, elderThing.size)
+
+                        // Incrémenter le score et ajouter un score temporaire
+                        score++
+                        temporaryScores.add(TemporaryScore(elderThing.x, elderThing.y))
+
+                        elderThingsDestroyed++
+
+                        // Si un Elder Thing est détruit, en créer un nouveau après un délai
+                        if (elderThingsDestroyed < elderThingScoreToWin) {
+                            postDelayed({
+                                if (elderThings.size < 5 && player.isAlive) {
+                                    val x = Random.nextFloat() * (screenWidth - elderThingSize) + elderThingSize / 2
+                                    val y = Random.nextFloat() * (screenHeight / 2) + elderThingSize / 2
+                                    elderThings.add(ElderThing(x, y, elderThingSize, screenWidth, screenHeight))
+                                }
+                            }, 2000)
+                        }
+                    }
+                    bulletsToRemove.add(bullet)
+                    break
+                }
+            }
+
+            // Vérifier les collisions avec le joueur
+            if (player.intersectsElderThing(elderThing)) {
+                updatePlayerHealth()
+                break
+            }
+
+            // Vérifier les collisions des projectiles avec le joueur
+            for (projectile in elderThing.projectiles) {
+                if (player.intersectsElderProjectile(projectile)) {
+                    updatePlayerHealth()
+                    elderThing.projectiles.remove(projectile)
+                    break
+                }
+            }
+        }
+
+        elderThings.removeAll(elderThingsToRemove)
+        bullets.removeAll(bulletsToRemove)
+    }
+
+    // Ajouter les méthodes d'extension pour les collisions
+    private fun Player.intersectsElderThing(elderThing: ElderThing): Boolean {
+        val distance = kotlin.math.hypot(x - elderThing.x, y - elderThing.y)
+        return distance < (size / 2 + elderThing.size / 2)
+    }
+
+    private fun Player.intersectsElderProjectile(projectile: ElderProjectile): Boolean {
+        val distance = kotlin.math.hypot(x - projectile.x, y - projectile.y)
+        return distance < (size / 2 + projectile.radius)
+    }
+
 
 }

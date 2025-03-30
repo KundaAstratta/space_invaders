@@ -9,6 +9,7 @@ import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.deepone.IchorousBlast
 import com.example.space_invaders.levels.shoggothLevel.MazeSystem
+import com.example.space_invaders.utils.Enums.BackgroundType
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -90,10 +91,19 @@ class Player(var x: Float, var y: Float, val size: Float) {
         screenWidth: Float,
         screenHeight: Float,
         structures: List<Background.Structure>,
-        mazeSystem: MazeSystem? = null
+        mazeSystem: MazeSystem? = null,
+        currentLevel: BackgroundType = BackgroundType.DEFAULT//String =  "" // Add a parameter to identify the level
     ) {
         var finalX = newX.coerceIn(size / 2, screenWidth - size / 2)
         var finalY = newY.coerceIn(size / 2, screenHeight - size / 2)
+
+        // If in ANTARTIC level, allow passing over structures
+        if (currentLevel == BackgroundType.ANTARTIC) { //"ANTARTIC") {
+            // Just use the constrained coordinates without structure collision check
+            x = finalX
+            y = finalY
+            return
+        }
 
         // If in Shoggoth level with maze system, use maze-specific movement
         if (mazeSystem != null) {
