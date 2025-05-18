@@ -20,6 +20,7 @@ import com.example.space_invaders.entities.deepone.DeepOne
 import com.example.space_invaders.entities.dhole.Dhole
 import com.example.space_invaders.entities.elderthing.ElderProjectile
 import com.example.space_invaders.entities.elderthing.ElderThing
+import com.example.space_invaders.entities.nightgaunt.NightgauntSwarm
 import com.example.space_invaders.entities.player.HealthBar
 import com.example.space_invaders.entities.player.Player
 import com.example.space_invaders.entities.player.ShootButton
@@ -99,7 +100,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Shoggoth related variables
     private val shoggoths = mutableListOf<Shoggoth>()
     private var shoggothSize = 0f
-    private var shoggothScoreToWin = 2// 50  Nombre de Shoggoths à détruire
+    private var shoggothScoreToWin = 1// 50  Nombre de Shoggoths à détruire
     private var shoggothsDestroyed = 0
     private lateinit var mazeSystem: MazeSystem
 
@@ -108,6 +109,17 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var elderThingSize = 0f
     private var elderThingScoreToWin = 10 // 100 Nombre d'Elder Things à détruire
     private var elderThingsDestroyed = 0
+
+    // --- Variables spécifiques au niveau Nightgaunt ---
+    private var nightgauntSwarm: NightgauntSwarm? = null
+    private var nightgauntsDestroyed = 0
+    private val nightgauntScoreToWin = 100 //3000
+    private var nightgauntSize = 0f // Sera initialisé dans onSizeChanged
+
+    // --- Variables pour la capture du joueur ---
+    private var isPlayerCaptured = false
+    private var captureStartTime = 0L
+    private val captureDuration = 10000L // 10 secondes en millisecondes
 
     //Transition
     private var transitionAlpha = 255 // Nouvelle variable pour l'alpha de la transition
@@ -154,6 +166,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Calculer la taille des ennemis
         byakheeWidth = (screenWidth - (numByakheeCols + 1) * byakheePadding) / numByakheeCols
         byakheeHeight = byakheeWidth / 2 // Ajustez le ratio selon vos préférences
+
+        // Calculer la taille des Nightgaunts (basée sur la taille de base définie dans le Swarm)
+        nightgauntSize = NightgauntSwarm.NIGHTGAUNT_BASE_SIZE * (screenWidth / 1080f) // Adapter à la largeur de l'écran
+
 
         // Initialiser le joueur
         val playerSize = screenWidth / 10
@@ -212,7 +228,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             player.draw(canvas, paint)
         }
 
-        //level shoggoths begin
         when {
             level <= maxByakheeLevels -> {
                 byakhees.forEach { it.draw(canvas, paint) }
@@ -235,8 +250,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 // Dessiner les Elder Things
                 elderThings.forEach { it.draw(canvas, paint) }
             }
+            level == (maxByakheeLevels + 6) -> {
+                // Dessiner les Nightgaunts
+                nightgauntSwarm?.draw(canvas, paint)
+            }
         }
-        //level shooggoths end
 
         bullets.forEach { it.draw(canvas, paint) }
 
@@ -282,13 +300,16 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // Add this method to handle gaining a life
     fun playerGainLife() {
-        if (player.lives < 15) {
-            player.lives++
-            invalidate() // Force redraw to update health bar
-        }
+        //if (player.lives < 150) {
+        //    player.lives++
+        //    invalidate() // Force redraw to update health bar
+        //}
+        player.lives = (player.lives + 20).coerceAtMost(150)
+        invalidate() // Force redrawto update health bar
     }
 
     // Modify the existing player.hit() calls to update the health bar
+    /*
     private fun updatePlayerHealth() {
         if (player.hit()) {
             player.createPlayerExplosion(explosions)
@@ -296,7 +317,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         }
         invalidate() // Force redraw to update health bar
     }
-
+    */
     //Mettre à jour la position du jour entre chaque stage
     private fun resetPlayerPosition() {
         val playerSize = screenWidth / 10
@@ -322,6 +343,25 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
     // Mettre à jour l'état du jeu
     private fun update() {
+
+        val currentTime = System.currentTimeMillis()
+
+        // --- Mettre à jour le joueur ---
+        // Gérer la fin de la capture
+        if (isPlayerCaptured && currentTime > captureStartTime + captureDuration) {
+            isPlayerCaptured = false
+            // Ajouter un effet pour montrer que le joueur est libéré ?
+        }
+
+        // Si le joueur est capturé, son mouvement est dicté par l'essaim
+        if (isPlayerCaptured && nightgauntSwarm != null) {
+            val (dx, dy) = nightgauntSwarm!!.getSwarmDeltaMovement()
+            // Appliquer le mouvement de l'essaim au joueur, en le maintenant dans l'écran
+            val capturedPlayerX = (player.x + dx).coerceIn(player.size / 2, screenWidth - player.size / 2)
+            val capturedPlayerY = (player.y + dy).coerceIn(player.size / 2, screenHeight - player.size / 2)
+            player.x = capturedPlayerX
+            player.y = capturedPlayerY
+        }
 
         bullets.forEach { it.move() }
 
@@ -365,6 +405,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
             level == (maxByakheeLevels + 4) -> updateShoggoth()
             level == (maxByakheeLevels + 5) -> updateElderThing()
+            level == (maxByakheeLevels + 6) -> updateNightgaunt();
         }
 
         //explosion
@@ -380,7 +421,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             (level == (maxByakheeLevels + 2) && deepOneScore >= deepOneScoreToWin) ||
             (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed >= colorOutOfSpaceScoreToWin) ||
             (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin) ||
-            (level == (maxByakheeLevels + 5) && elderThingsDestroyed >= elderThingScoreToWin)
+            (level == (maxByakheeLevels + 5) && elderThingsDestroyed >= elderThingScoreToWin) ||
+            (level == (maxByakheeLevels + 6) && nightgauntsDestroyed >= nightgauntScoreToWin)
         ) {
             startNextLevel()
         }
@@ -471,6 +513,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 createElderThings()
                 //background.switchBackground(Background.BackgroundType.COLOUR_OUT_OF_SPACE) // Nous ajouterons ce type plus tard
                 background.switchBackground(BackgroundType.ANTARTIC) // Nous ajouterons ce type plus tard
+            }
+            level == (maxByakheeLevels + 6) -> {
+                createNightgaunt()
+                background.switchBackground(BackgroundType.DREAMLANDS)
             }
         }
 
@@ -618,7 +664,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Vérifier les collisions des Byakhee avec le player
         for (byakhee in byakhees) {
             if (player.intersectsByakhee(byakhee)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife() // Perd 1 vie par défaut
                 byakhees.remove(byakhee)
                 break
             }
@@ -690,7 +737,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         dhole?.let { currentDhole ->
             currentDhole.move(screenWidth, screenHeight)
             if (currentDhole.intersectsPlayer(player)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 // Ajouter un petit délai d'invincibilité pour éviter des hits multiples trop rapides
                 currentDhole.setInvincibilityFrame()
             }
@@ -792,7 +840,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Vérifier les collisions des DeepOne avec le player
         for (deepOne in deepOnes) {
             if (player.intersectsDeepOne(deepOne)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 deepOnes.remove(deepOne)
                 break
             }
@@ -803,7 +852,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         for (deepOne in deepOnes) {
             for (blast in deepOne.ichorousBlasts) {
                 if (player.intersectsIchorousBlast(blast)) {
-                    updatePlayerHealth()
+                    //updatePlayerHealth()
+                    playerLosesLife()
                     deepOne.ichorousBlasts.remove(blast) // Supprimer le blast après collision
                     break
                 }
@@ -841,7 +891,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
             // Vérifier la collision avec le joueur
             if (tentacle.intersectsPlayer(player.x, player.y, player.size / 2)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 break
             }
         }
@@ -878,7 +929,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         // Vérifier les collisions des ColorOutOfSpace avec le joueur
         for (colorOutOfSpace in colorOutOfSpaces) {
             if (colorOutOfSpace.intersectsPlayer(player)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 colorOutOfSpaceToRemove.add(colorOutOfSpace)
                 createColorOutOfSpace()
                 break
@@ -957,6 +1009,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
                         score++
                         shoggothsDestroyed++
+                        // TEST
+                        playerGainLife() //Pour chaque Shoggots détruit j'ajoute 20 vies ???
+                        // TEST
 
                         temporaryScores.add(TemporaryScore(shoggoth.x + shoggoth.initialSize / 2, shoggoth.y + shoggoth.initialSize / 2))
 
@@ -991,7 +1046,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
             // Vérifier la collision avec le joueur
             if (player.intersectsShoggoth(shoggoth)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 // Vous pouvez également envisager de faire réapparaître le Shoggoth ici ou d'ajouter un effet de recul
                 break // Sortir de la boucle des Shoggoths après une collision avec le joueur
             }
@@ -1089,14 +1145,16 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
 
             // Vérifier les collisions avec le joueur
             if (player.intersectsElderThing(elderThing)) {
-                updatePlayerHealth()
+                //updatePlayerHealth()
+                playerLosesLife()
                 break
             }
 
             // Vérifier les collisions des projectiles avec le joueur
             for (projectile in elderThing.projectiles) {
                 if (player.intersectsElderProjectile(projectile)) {
-                    updatePlayerHealth()
+                    //updatePlayerHealth()
+                    playerLosesLife()
                     elderThing.projectiles.remove(projectile)
                     break
                 }
@@ -1117,6 +1175,149 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val distance = kotlin.math.hypot(x - projectile.x, y - projectile.y)
         return distance < (size / 2 + projectile.radius)
     }
+
+    //Code spécifique aux Nightgaunt
+    //Code spécifique aux Nightgaunt
+    //Code spécifique aux Nightgaunt
+    private fun createNightgaunt() {
+        nightgauntSwarm = NightgauntSwarm(screenWidth, screenHeight, player)
+        nightgauntsDestroyed = 0
+        isPlayerCaptured = false // S'assurer que le joueur n'est pas capturé au début
+    }
+/*
+    private fun updateNightgaunt() {
+        nightgauntSwarm?.let { swarm ->
+            // Mettre à jour l'essaim (mouvement, collisions internes avec balles, collision avec joueur)
+            // La méthode update retourne le nombre de nightgaunts détruits par les balles et si une collision joueur a eu lieu
+            //val (destroyedCount, playerCollisionDetected) = swarm.update(bullets, isPlayerCaptured)
+            val (destroyedPositions, playerCollisionDetected) = swarm.update(bullets, isPlayerCaptured)
+
+            // Mettre à jour le score et le compteur
+            /*
+            if (destroyedCount > 0) {
+                score += destroyedCount * 5 // 5 points par Nightgaunt
+                nightgauntsDestroyed += destroyedCount
+                // Ajouter des scores temporaires (peut être fait dans l'essaim ou ici)
+                // Pour l'instant, on le fait ici pour simplifier
+                // Trouver une position approximative pour le score (ex: centre de l'essaim?)
+                // temporaryScores.add(TemporaryScore(swarm.swarmCenterX, swarm.swarmCenterY, value = destroyedCount * 5)) // Pas idéal
+                // Il faudrait récupérer les positions des nightgaunts détruits... Complexifie.
+                // On peut simplifier et juste afficher un +X au centre de l'écran ?
+                // Ou ne pas afficher de score individuel pour l'essaim.
+                println("$destroyedCount nightgaunts destroyed this frame.") // Log
+            }
+            */
+            if (destroyedPositions.isNotEmpty()) {
+                destroyedPositions.forEach { position ->
+                    score += 1 // Augmenter le score de 1 pour chaque Nightgaunt
+                    nightgauntsDestroyed += 1 // Augmenter le compteur total
+
+                    // Créer l'animation de score temporaire "+1" à la position du Nightgaunt
+                    temporaryScores.add(TemporaryScore(position.first, position.second))
+                }
+                // Log mis à jour pour utiliser la taille de la liste
+                println("${destroyedPositions.size} nightgaunts destroyed this frame. Total: $nightgauntsDestroyed / $nightgauntScoreToWin")
+            }
+
+            // Gérer la capture du joueur
+            if (playerCollisionDetected && !isPlayerCaptured && player.isAlive) {
+                println("Player captured by Nightgaunts!") // Log
+                isPlayerCaptured = true
+                captureStartTime = System.currentTimeMillis()
+                playerLosesLife(5) // Perd 5 vies instantanément
+                // Jouer un son de capture ?
+                // soundManager.playSound(R.raw.capture_sound)
+                // Effet visuel de capture ?
+            }
+
+            // Vérifier si l'essaim est vide et si on doit en faire réapparaitre
+            // (Seulement si l'objectif n'est pas atteint)
+            if (swarm.isEmpty() && nightgauntsDestroyed < nightgauntScoreToWin && !isTransitioning) {
+                println("Swarm destroyed, creating a new one.") // Log
+                // Ajouter un délai avant la réapparition du nouvel essaim
+                postDelayed({
+                    // Vérifier à nouveau au cas où le niveau aurait changé pendant le délai
+                    if ((level == maxByakheeLevels + 6) && !isTransitioning) {
+                        nightgauntSwarm = NightgauntSwarm(screenWidth, screenHeight, player)
+                    }
+                }, 3000) // Délai de 3 secondes
+                nightgauntSwarm = null // Marquer l'essaim actuel comme nul pour éviter les updates/draws
+            }
+        }
+
+    }
+ */
+    // Dans la classe SpaceInvadersView (fichier SpaceInvadersView.kt)
+
+    /**
+     * Met à jour la logique spécifique au niveau des Nightgaunts.
+     * Gère le mouvement de l'essaim, les collisions, la capture du joueur,
+     * le score, et la réapparition des essaims.
+     */
+    private fun updateNightgaunt() {
+
+        // Vérifie si un essaim existe
+        if (nightgauntSwarm != null) {
+            // Utilisation de 'val swarm = nightgauntSwarm!!' est sûr ici car on vient de vérifier la nullité
+            val swarm = nightgauntSwarm!!
+
+            // 1. Mettre à jour l'essaim (mouvement, collisions internes, détection collision joueur)
+            val (destroyedPositions, playerCollisionDetected) = swarm.update(bullets, isPlayerCaptured)
+
+            // 2. Traiter les Nightgaunts détruits (score et animation)
+            if (destroyedPositions.isNotEmpty()) {
+                destroyedPositions.forEach { position ->
+                    score += 1
+                    nightgauntsDestroyed += 1
+                    temporaryScores.add(TemporaryScore(position.first, position.second))
+                }
+                println("${destroyedPositions.size} nightgaunts destroyed this frame. Total: $nightgauntsDestroyed / $nightgauntScoreToWin")
+            }
+
+            // 3. Gérer la capture du joueur
+            if (playerCollisionDetected && !isPlayerCaptured && player.isAlive) {
+                println("Player captured by Nightgaunts!")
+                playerLosesLife(5)
+                isPlayerCaptured = true
+                captureStartTime = System.currentTimeMillis()
+                // soundManager.playSound(R.raw.capture_sound)
+            }
+
+            // 4. Gérer la réapparition de l'essaim s'il est vide
+            if (swarm.isEmpty() && nightgauntsDestroyed < nightgauntScoreToWin && !isTransitioning) {
+                println("Swarm destroyed, creating a new one immediately.")
+                // Remplace l'essaim actuel (qui est vide) par un nouveau
+                nightgauntSwarm = NightgauntSwarm(screenWidth, screenHeight, player)
+            }
+
+        }
+        // 5. Else: Si nightgauntSwarm était null au début de la fonction
+        else {
+            // Cette partie s'exécute si aucun essaim n'existe.
+            // Principalement pour la création initiale au début du niveau,
+            // ou si l'essaim a été mis à null pour une raison quelconque.
+            // Vérifie si les conditions pour créer un essaim sont réunies.
+            if (nightgauntsDestroyed < nightgauntScoreToWin && (level == maxByakheeLevels + 6) && !isTransitioning) {
+                println("Swarm is null. Creating initial or replacement swarm.")
+                nightgauntSwarm = NightgauntSwarm(screenWidth, screenHeight, player)
+            }
+        }
+    } // Fin de la fonction updateNightgaunt
+
+    // Modifiée pour accepter le nombre de vies à perdre
+    private fun playerLosesLife(livesToLose: Int = 1) {
+        if (!player.isAlive || isPlayerCaptured) return // Ne pas perdre de vie si déjà mort ou pendant la capture initiale
+
+        if (player.hit(livesToLose)) { // La méthode hit gère la décrémentation et renvoie true si vivant
+            // Ajouter un effet visuel/sonore de dégât
+            // soundManager.playSound(R.raw.player_hit_sound) // Ajouter un son
+            invalidate() // Mettre à jour la barre de vie immédiatement
+        } else {
+            // Le joueur est mort
+            checkGameOver()
+        }
+    }
+
 
 
 }
