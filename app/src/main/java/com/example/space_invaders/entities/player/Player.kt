@@ -19,7 +19,7 @@ import kotlin.random.Random
 class Player(var x: Float, var y: Float, val size: Float) {
     var lives = 200//20
     var isAlive = true
-    private var lifeLossAnimation: LifeLossAnimation? = null
+    var lifeLossAnimation: LifeLossAnimation? = null
 
     private var pulseRadius = 0f
     private var pulseDirection = 1 // 1 pour expansion, -1 pour contraction
@@ -129,7 +129,7 @@ class Player(var x: Float, var y: Float, val size: Float) {
         y = finalY
         //++++
     }
-
+/*
     fun hit(): Boolean {
         lives--
         if (lives <= 0) {
@@ -139,6 +139,35 @@ class Player(var x: Float, var y: Float, val size: Float) {
             lifeLossAnimation = LifeLossAnimation(x + size / 2, y - size / 2)
         }
         return !isAlive
+    }
+*/
+
+    fun hit(livesToLose: Int = 1): Boolean {
+        // Ne rien faire si le joueur est déjà mort
+        if (!isAlive) {
+            return false
+        }
+
+        lives -= livesToLose // Retire le nombre de vies spécifié
+
+        if (lives <= 0) {
+            lives = 0 // Empêche les vies négatives
+            isAlive = false
+            // On pourrait vouloir arrêter une animation en cours ou en créer une de mort ici
+            lifeLossAnimation = null // Ou une animation de mort ?
+            println("Player has died!") // Log de débogage
+        } else {
+            // Le joueur est toujours en vie
+            isAlive = true // Assure que le flag est correct (normalement déjà le cas)
+            // Créer ou mettre à jour l'animation de perte de vie
+            // Attention: si le joueur perd 5 vies d'un coup, cela ne crée qu'une animation.
+            // Si vous voulez 5 animations, la logique serait différente.
+            lifeLossAnimation = LifeLossAnimation(x + size / 2, y - size / 2, livesToLose)
+            println("Player hit, $lives lives remaining.") // Log de débogage
+        }
+
+        // Retourne l'état de vie actuel du joueur APRES avoir subi le coup
+        return isAlive
     }
 
     fun intersectsByakhee(byakhee: Byakhee): Boolean {
