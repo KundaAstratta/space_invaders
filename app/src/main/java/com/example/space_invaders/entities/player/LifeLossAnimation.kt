@@ -4,7 +4,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 
-class LifeLossAnimation(private val startX: Float, private val startY: Float) {
+class LifeLossAnimation(
+    private val startX: Float,
+    private val startY: Float,
+    private val livesLost: Int
+) {
     private var currentY = startY
     private var alpha = 255
     private val duration = 100 // Durée de l'animation (nombre d'itérations)
@@ -14,7 +18,8 @@ class LifeLossAnimation(private val startX: Float, private val startY: Float) {
         paint.color = Color.argb(alpha, 255, 0, 0) // Couleur rouge avec transparence
         paint.textSize = 150f // Taille du texte
         paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("-1", startX, currentY, paint)
+        //canvas.drawText("-1", startX, currentY, paint)
+        canvas.drawText("-${livesLost}", startX, currentY, paint)
     }
 
     fun update() {

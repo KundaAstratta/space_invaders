@@ -9,7 +9,8 @@ class Enums  {
         RLYEH,
         COLOUR_OUT_OF_SPACE,
         LUNAR_SPACE,
-        ANTARTIC
+        ANTARTIC,
+        DREAMLANDS
         // Ajoutez d'autres types de fond ici au besoin
     }
 }

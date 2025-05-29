@@ -23,7 +23,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
     private var backgroundBitmap: Bitmap? = null
     private val snowflakes = mutableListOf<Snowflake>()
 
-
+    // Niveau Nightgaunt - Variables pour l'effet visuel si nécessaire
+    private var dreamlandsShift = 0f
 
     init {
         loadBackgroundImage()
@@ -42,6 +43,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COLOUR_OUT_OF_SPACE -> R.drawable.color_out_of_space_background
             BackgroundType.LUNAR_SPACE -> R.drawable.lunar_background
             BackgroundType.ANTARTIC -> R.drawable.antartic_background
+            BackgroundType.DREAMLANDS -> R.drawable.dreamland_background
         }
 
         val options = BitmapFactory.Options().apply {
@@ -55,8 +57,20 @@ class Background(private val context: Context, private val screenWidth: Float, p
             inSampleSize = sampleSize
         }
 
-        backgroundBitmap = BitmapFactory.decodeResource(context.resources, resourceId, options)
-        backgroundBitmap = Bitmap.createScaledBitmap(backgroundBitmap!!, screenWidth.toInt(), screenHeight.toInt(), true)
+        try {
+            backgroundBitmap?.recycle() // Libérer l'ancienne bitmap si elle existe
+            backgroundBitmap = BitmapFactory.decodeResource(context.resources, resourceId, options)?.let {
+                Bitmap.createScaledBitmap(it, screenWidth.toInt(), screenHeight.toInt(), true)
+            }
+        } catch (e: OutOfMemoryError) {
+            println("Erreur de mémoire lors du chargement de l'image de fond: ${e.message}")
+            // Gérer l'erreur, peut-être utiliser une couleur de fond simple
+            backgroundBitmap = null // Assurez-vous que la bitmap est nulle si le chargement échoue
+        } catch (e: Exception) {
+            println("Erreur lors du chargement de l'image de fond: ${e.message}")
+            backgroundBitmap = null
+        }
+
     }
 
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
@@ -85,6 +99,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
             BackgroundType.LUNAR_SPACE -> generateLunarSpaceStructures()
             BackgroundType.ANTARTIC -> generateAntarticStructures()
+            BackgroundType.DREAMLANDS -> generateDreamlandsStructures()
         }
     }
 
@@ -185,10 +200,24 @@ class Background(private val context: Context, private val screenWidth: Float, p
         }
     }
 
+    private fun generateDreamlandsStructures() {
+        // Pour l'instant, pas de structures spécifiques pour les Dreamlands
+        // On pourrait ajouter des éléments flottants étranges plus tard
+        structures.clear()
+    }
+
     fun draw(canvas: Canvas) {
-        // Dessiner l'image de fond
+        // Dessiner l'image de fond si elle existe
         backgroundBitmap?.let { bitmap ->
-            canvas.drawBitmap(bitmap, 0f, 0f, null)
+            if (!bitmap.isRecycled) { // Vérifier si la bitmap est valide
+                canvas.drawBitmap(bitmap, 0f, 0f, null)
+            } else {
+                // Fallback si la bitmap a été recyclée (par exemple, couleur de fond)
+                canvas.drawColor(Color.BLACK) // Ou une autre couleur appropriée
+            }
+        } ?: run {
+            // Si backgroundBitmap est null (erreur de chargement), dessiner un fond simple
+            canvas.drawColor(Color.BLACK) // Ou une autre couleur par défaut
         }
 
         when (backgroundType) {
@@ -199,6 +228,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.COLOUR_OUT_OF_SPACE -> drawColourOutOfSpace(canvas)
             BackgroundType.LUNAR_SPACE -> drawLunarSpaceStructures(canvas)
             BackgroundType.ANTARTIC -> drawAntarticStructures(canvas)
+            BackgroundType.DREAMLANDS -> drawDreamlandsStructures(canvas)
         }
     }
 
@@ -245,6 +275,20 @@ class Background(private val context: Context, private val screenWidth: Float, p
 
         // Animer et dessiner les flocons de neige
         updateAndDrawSnowflakes(canvas)
+    }
+
+    private fun drawDreamlandsStructures(canvas: Canvas) {
+        // Pour l'instant, juste un effet simple ou les étoiles
+        drawStars(canvas) // Dessine des étoiles simples
+        // On pourrait ajouter un effet visuel subtil, comme un décalage de couleur
+        dreamlandsShift += 0.5f
+        if (dreamlandsShift > screenWidth) dreamlandsShift = 0f
+        // Exemple: dessiner une couche de couleur semi-transparente qui bouge
+        // paint.color = Color.argb(30, 100, 0, 150) // Violet translucide
+        // canvas.save()
+        // canvas.translate(dreamlandsShift - screenWidth / 2, 0f)
+        // canvas.drawRect(-screenWidth, 0f, screenWidth * 2, screenHeight, paint)
+        // canvas.restore()
     }
 
     private fun drawStars(canvas: Canvas) {
