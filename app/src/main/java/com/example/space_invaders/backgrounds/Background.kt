@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import com.example.space_invaders.R
@@ -44,6 +45,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.LUNAR_SPACE -> R.drawable.lunar_background
             BackgroundType.ANTARTIC -> R.drawable.antartic_background
             BackgroundType.DREAMLANDS -> R.drawable.dreamland_background
+            BackgroundType.SERPENT_TEMPLE -> R.drawable.serpent_temple_background
         }
 
         val options = BitmapFactory.Options().apply {
@@ -93,14 +95,26 @@ class Background(private val context: Context, private val screenWidth: Float, p
         structures.clear()
         when (backgroundType) {
             BackgroundType.DEFAULT -> generateDefault()
-            BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins()
+            BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins() // TEST TEST
+            //BackgroundType.COSMIC_HORROR_RUINS -> generateSerpentTempleStructures() //TEST TEST level you want
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
             BackgroundType.RLYEH -> generateRlyehStructures()
             BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
             BackgroundType.LUNAR_SPACE -> generateLunarSpaceStructures()
             BackgroundType.ANTARTIC -> generateAntarticStructures()
             BackgroundType.DREAMLANDS -> generateDreamlandsStructures()
+            BackgroundType.SERPENT_TEMPLE -> generateSerpentTempleStructures()
         }
+    }
+
+    private fun generateSerpentTempleStructures() {
+        structures.clear()
+        val pillarWidth = screenWidth * 0.08f
+        val pillarHeight = screenHeight * 0.4f
+        // Pilier gauche
+        structures.add(SerpentPillar(pillarWidth / 2, screenHeight - pillarHeight / 2, pillarWidth, pillarHeight))
+        // Pilier droit
+        structures.add(SerpentPillar(screenWidth - pillarWidth / 2, screenHeight - pillarHeight / 2, pillarWidth, pillarHeight))
     }
 
     private fun generateByakheeRuins() {
@@ -229,6 +243,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.LUNAR_SPACE -> drawLunarSpaceStructures(canvas)
             BackgroundType.ANTARTIC -> drawAntarticStructures(canvas)
             BackgroundType.DREAMLANDS -> drawDreamlandsStructures(canvas)
+            BackgroundType.SERPENT_TEMPLE -> drawSerpentTempleStructures(canvas) // AJOUT
         }
     }
 
@@ -291,6 +306,13 @@ class Background(private val context: Context, private val screenWidth: Float, p
         // canvas.restore()
     }
 
+    // AJOUT: Dessin des structures du temple
+    private fun drawSerpentTempleStructures(canvas: Canvas) {
+        for (structure in structures) {
+            structure.draw(canvas)
+        }
+    }
+
     private fun drawStars(canvas: Canvas) {
         paint.color = Color.WHITE
         for (i in 0..200) {
@@ -344,6 +366,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
         val centerY: Float,
         val radius: Float
     ) {
+        protected val structurePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
         private val gradientPaint = Paint()
         private val gradient: RadialGradient
         private val whitePaint = Paint().apply {
@@ -398,6 +422,56 @@ class Background(private val context: Context, private val screenWidth: Float, p
             val distanceY = Math.abs(objY - centerY)
             val distance = Math.sqrt((distanceX * distanceX + distanceY * distanceY).toDouble()).toFloat()
             return distance < radius + objDiameter / 2
+        }
+    }
+
+    class SerpentPillar(centerX: Float, centerY: Float, private val width: Float, private val height: Float)
+        : Structure(centerX, centerY, width / 2) {
+
+        private val pillarPath = Path()
+
+        init {
+            structurePaint.style = Paint.Style.FILL
+            structurePaint.color = Color.rgb(60, 80, 70) // Vert pierre sombre
+
+            // Forme du pilier
+            val rectLeft = centerX - width / 2
+            val rectTop = centerY - height / 2
+            val rectRight = centerX + width / 2
+            val rectBottom = centerY + height / 2
+            pillarPath.addRect(rectLeft, rectTop, rectRight, rectBottom, Path.Direction.CW)
+        }
+
+        override fun draw(canvas: Canvas) {
+            // Dessiner le pilier principal
+            canvas.drawPath(pillarPath, structurePaint)
+
+            // Ajouter des décorations (gravures)
+            structurePaint.style = Paint.Style.STROKE
+            structurePaint.color = Color.rgb(40, 60, 50)
+            structurePaint.strokeWidth = 5f
+            val rectLeft = centerX - width / 2
+            val rectTop = centerY - height / 2
+
+            for (i in 1..5) {
+                val yPos = rectTop + (i * height / 6)
+                canvas.drawLine(rectLeft, yPos, rectLeft + width, yPos, structurePaint)
+            }
+        }
+
+        fun intersectsRect(rectX: Float, rectY: Float, rectWidth: Float, rectHeight: Float): Boolean {
+            val pillarLeft = centerX - width / 2
+            val pillarRight = centerX + width / 2
+            val pillarTop = centerY - height / 2
+            val pillarBottom = centerY + height / 2
+
+            val rectLeft = rectX - rectWidth / 2
+            val rectRight = rectX + rectWidth / 2
+            val rectTop = rectY - rectHeight / 2
+            val rectBottom = rectY + rectHeight / 2
+
+            return rectLeft < pillarRight && rectRight > pillarLeft &&
+                    rectTop < pillarBottom && rectBottom > pillarTop
         }
     }
 
