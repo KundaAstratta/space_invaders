@@ -25,6 +25,9 @@ import com.example.space_invaders.entities.player.HealthBar
 import com.example.space_invaders.entities.player.Player
 import com.example.space_invaders.entities.player.ShootButton
 import com.example.space_invaders.entities.player.ShootDirection
+import com.example.space_invaders.entities.serpentman.SerpentMan
+import com.example.space_invaders.entities.serpentman.SerpentManIllusion
+import com.example.space_invaders.entities.serpentman.SerpentManProjectile
 import com.example.space_invaders.entities.shoggoth.Shoggoth
 import com.example.space_invaders.game.activity.GameOverActivity
 import com.example.space_invaders.levels.rlyehLevel.CyclopeanStructure
@@ -48,7 +51,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private var level = 1
+    private var level = 1 // 8 TEST TEST the level you want
     private var isPlayerTouched = false
     private var touchOffsetX = 0f
     private var touchOffsetY = 0f
@@ -115,6 +118,15 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var nightgauntsDestroyed = 0
     private val nightgauntScoreToWin = 100 //3000
     private var nightgauntSize = 0f // Sera initialisé dans onSizeChanged
+
+    // --- Variables spécifiques au niveau Homme serpent ---
+    private val serpentMen = mutableListOf<SerpentMan>()
+    private val serpentManProjectiles = mutableListOf<SerpentManProjectile>()
+    private val serpentManIllusions = mutableListOf<SerpentManIllusion>()
+    private var serpentManSize = 0f
+    private var serpentMenDestroyed = 0
+    private var serpentMenAlive = 15 // 3
+    private val serpentMenScoreToWin = 500 // 15   Nombre d'Hommes-Serpents à vaincre
 
     // --- Variables pour la capture du joueur ---
     private var isPlayerCaptured = false
@@ -185,6 +197,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         createByakhees()
 
         elderThingSize = screenWidth / 7
+        serpentManSize = screenWidth / 9 // AJOUT: Taille des Hommes-Serpents
+
 
         // Jouer un son de grésillement différent selon le niveau
         soundManager.playSound(R.raw.tv_static)
@@ -254,6 +268,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 // Dessiner les Nightgaunts
                 nightgauntSwarm?.draw(canvas, paint)
             }
+            // AJOUT: Dessin pour le niveau Homme-Serpent
+            level == (maxByakheeLevels + 7) -> {
+                serpentMen.forEach { it.draw(canvas) }
+                serpentManProjectiles.forEach { it.draw(canvas) }
+                serpentManIllusions.forEach { it.draw(canvas) }
+            }
         }
 
         bullets.forEach { it.draw(canvas, paint) }
@@ -308,16 +328,6 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         invalidate() // Force redrawto update health bar
     }
 
-    // Modify the existing player.hit() calls to update the health bar
-    /*
-    private fun updatePlayerHealth() {
-        if (player.hit()) {
-            player.createPlayerExplosion(explosions)
-            checkGameOver()
-        }
-        invalidate() // Force redraw to update health bar
-    }
-    */
     //Mettre à jour la position du jour entre chaque stage
     private fun resetPlayerPosition() {
         val playerSize = screenWidth / 10
@@ -405,7 +415,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
             level == (maxByakheeLevels + 4) -> updateShoggoth()
             level == (maxByakheeLevels + 5) -> updateElderThing()
-            level == (maxByakheeLevels + 6) -> updateNightgaunt();
+            level == (maxByakheeLevels + 6) -> updateNightgaunt()
+            level == (maxByakheeLevels + 7) -> updateSerpentMen() // AJOUT
         }
 
         //explosion
@@ -422,7 +433,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             (level == (maxByakheeLevels + 3) && colorOutOfSpaceDestroyed >= colorOutOfSpaceScoreToWin) ||
             (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin) ||
             (level == (maxByakheeLevels + 5) && elderThingsDestroyed >= elderThingScoreToWin) ||
-            (level == (maxByakheeLevels + 6) && nightgauntsDestroyed >= nightgauntScoreToWin)
+            (level == (maxByakheeLevels + 6) && nightgauntsDestroyed >= nightgauntScoreToWin) ||
+            (level == (maxByakheeLevels + 7) && serpentMenDestroyed >= serpentMenScoreToWin) // AJOUT
         ) {
             startNextLevel()
         }
@@ -447,6 +459,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         colorOutOfSpaceDestroyed = 0 // Compteur de ColorOutOfSpace détruits
         shoggothsDestroyed = 0 // Compteur de Shoggoths détruits
         elderThingsDestroyed = 0 // Réinitialiser le compteur d'Elder Things détruits
+        serpentMenDestroyed = 0 // AJOUT: Réinitialiser compteur Hommes-Serpents
 
         isTransitioning = true // Démarrer la transition
         transitionAlpha = 255 // Réinitialiser l'alpha
@@ -470,6 +483,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         deepOnes.clear()
         deepOnes.forEach { it.ichorousBlasts.clear() } // Effacer les tirs de chaque DeepOne
         colorOutOfSpaces.clear()
+        shoggoths.clear()
+        elderThings.clear()
+        serpentMen.clear() // AJOUT
+        serpentManIllusions.clear() // AJOUT
+        serpentManProjectiles.clear() // AJOUT
 
         // Réinitialiser les tentacules
         tentacles.clear()
@@ -517,6 +535,11 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             level == (maxByakheeLevels + 6) -> {
                 createNightgaunt()
                 background.switchBackground(BackgroundType.DREAMLANDS)
+            }
+            // AJOUT: Lancement du niveau Homme-Serpent
+            level == (maxByakheeLevels + 7) -> {
+                createSerpentMen()
+                background.switchBackground(BackgroundType.SERPENT_TEMPLE)
             }
         }
 
@@ -1184,69 +1207,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         nightgauntsDestroyed = 0
         isPlayerCaptured = false // S'assurer que le joueur n'est pas capturé au début
     }
-/*
-    private fun updateNightgaunt() {
-        nightgauntSwarm?.let { swarm ->
-            // Mettre à jour l'essaim (mouvement, collisions internes avec balles, collision avec joueur)
-            // La méthode update retourne le nombre de nightgaunts détruits par les balles et si une collision joueur a eu lieu
-            //val (destroyedCount, playerCollisionDetected) = swarm.update(bullets, isPlayerCaptured)
-            val (destroyedPositions, playerCollisionDetected) = swarm.update(bullets, isPlayerCaptured)
 
-            // Mettre à jour le score et le compteur
-            /*
-            if (destroyedCount > 0) {
-                score += destroyedCount * 5 // 5 points par Nightgaunt
-                nightgauntsDestroyed += destroyedCount
-                // Ajouter des scores temporaires (peut être fait dans l'essaim ou ici)
-                // Pour l'instant, on le fait ici pour simplifier
-                // Trouver une position approximative pour le score (ex: centre de l'essaim?)
-                // temporaryScores.add(TemporaryScore(swarm.swarmCenterX, swarm.swarmCenterY, value = destroyedCount * 5)) // Pas idéal
-                // Il faudrait récupérer les positions des nightgaunts détruits... Complexifie.
-                // On peut simplifier et juste afficher un +X au centre de l'écran ?
-                // Ou ne pas afficher de score individuel pour l'essaim.
-                println("$destroyedCount nightgaunts destroyed this frame.") // Log
-            }
-            */
-            if (destroyedPositions.isNotEmpty()) {
-                destroyedPositions.forEach { position ->
-                    score += 1 // Augmenter le score de 1 pour chaque Nightgaunt
-                    nightgauntsDestroyed += 1 // Augmenter le compteur total
-
-                    // Créer l'animation de score temporaire "+1" à la position du Nightgaunt
-                    temporaryScores.add(TemporaryScore(position.first, position.second))
-                }
-                // Log mis à jour pour utiliser la taille de la liste
-                println("${destroyedPositions.size} nightgaunts destroyed this frame. Total: $nightgauntsDestroyed / $nightgauntScoreToWin")
-            }
-
-            // Gérer la capture du joueur
-            if (playerCollisionDetected && !isPlayerCaptured && player.isAlive) {
-                println("Player captured by Nightgaunts!") // Log
-                isPlayerCaptured = true
-                captureStartTime = System.currentTimeMillis()
-                playerLosesLife(5) // Perd 5 vies instantanément
-                // Jouer un son de capture ?
-                // soundManager.playSound(R.raw.capture_sound)
-                // Effet visuel de capture ?
-            }
-
-            // Vérifier si l'essaim est vide et si on doit en faire réapparaitre
-            // (Seulement si l'objectif n'est pas atteint)
-            if (swarm.isEmpty() && nightgauntsDestroyed < nightgauntScoreToWin && !isTransitioning) {
-                println("Swarm destroyed, creating a new one.") // Log
-                // Ajouter un délai avant la réapparition du nouvel essaim
-                postDelayed({
-                    // Vérifier à nouveau au cas où le niveau aurait changé pendant le délai
-                    if ((level == maxByakheeLevels + 6) && !isTransitioning) {
-                        nightgauntSwarm = NightgauntSwarm(screenWidth, screenHeight, player)
-                    }
-                }, 3000) // Délai de 3 secondes
-                nightgauntSwarm = null // Marquer l'essaim actuel comme nul pour éviter les updates/draws
-            }
-        }
-
-    }
- */
     // Dans la classe SpaceInvadersView (fichier SpaceInvadersView.kt)
 
     /**
@@ -1303,6 +1264,106 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             }
         }
     } // Fin de la fonction updateNightgaunt
+
+
+    // AJOUT: Logique pour le niveau Homme-Serpent
+    // AJOUT: Logique pour le niveau Homme-Serpent
+    // AJOUT: Logique pour le niveau Homme-Serpent
+
+    private fun createSerpentMen() {
+        serpentMen.clear()
+        serpentManIllusions.clear()
+        serpentManProjectiles.clear()
+        // Créer 3 Hommes-Serpents
+        for (i in 0 until 3) {
+            val x = (screenWidth / 4) * (i + 1)
+            val y = screenHeight / 4
+            serpentMen.add(SerpentMan(x, y, serpentManSize, screenWidth, screenHeight, player))
+        }
+    }
+
+    private fun updateSerpentMen() {
+        // --- Mise à jour des Hommes-Serpents ---
+        val serpentMenToRemove = mutableListOf<SerpentMan>()
+        for (serpentMan in serpentMen) {
+            serpentMan.update()
+            serpentMan.maybeAttack(serpentManProjectiles, serpentManIllusions)
+
+            // Collision avec le joueur
+            if (player.intersectsSerpentMan(serpentMan)) {
+                playerLosesLife(2) // Collision directe plus punitive
+                serpentMenToRemove.add(serpentMan)
+                createExplosion(serpentMan.x, serpentMan.y, serpentMan.size, serpentMan.size)
+            }
+        }
+        serpentMen.removeAll(serpentMenToRemove)
+
+
+        // --- Mise à jour des projectiles ---
+        val projectilesToRemove = mutableListOf<SerpentManProjectile>()
+        for (projectile in serpentManProjectiles) {
+            projectile.move()
+            if (projectile.isOffScreen(screenWidth, screenHeight)) {
+                projectilesToRemove.add(projectile)
+            } else if (projectile.intersectsPlayer(player)) {
+                playerLosesLife()
+                projectilesToRemove.add(projectile)
+            }
+        }
+        serpentManProjectiles.removeAll(projectilesToRemove)
+
+
+        // --- Mise à jour des illusions ---
+        val illusionsToRemove = mutableListOf<SerpentManIllusion>()
+        for (illusion in serpentManIllusions) {
+            if (!illusion.update() || illusion.isOffScreen(screenWidth, screenHeight)) {
+                illusionsToRemove.add(illusion)
+            } else if (illusion.intersectsPlayer(player)) {
+                playerLosesLife(5) // Perd 5 points de score
+                //temporaryScores.add(TemporaryScore(illusion.x, illusion.y))
+                illusionsToRemove.add(illusion)
+            }
+        }
+        serpentManIllusions.removeAll(illusionsToRemove)
+
+
+        // --- Collision des balles du joueur avec les Hommes-Serpents ---
+        val bulletsToRemove = mutableListOf<Bullet>()
+        for (bullet in bullets) {
+            for (serpentMan in serpentMen) {
+                if (serpentMan.intersectsBullet(bullet.x, bullet.y, bullet.maxRadius)) {
+                    bulletsToRemove.add(bullet)
+                    if (serpentMan.hit()) {
+                        serpentMenToRemove.add(serpentMan)
+                        createExplosion(serpentMan.x, serpentMan.y, serpentMan.size, serpentMan.size)
+                        score += 10 // Gagner 10 points
+                        serpentMenDestroyed++
+                        temporaryScores.add(TemporaryScore(serpentMan.x, serpentMan.y))
+                    }
+                    break // La balle ne peut toucher qu'un ennemi
+                }
+            }
+        }
+        bullets.removeAll(bulletsToRemove)
+        serpentMen.removeAll(serpentMenToRemove)
+
+        // Faire réapparaître les Hommes-Serpents pour maintenir le défi
+        if (serpentMen.size < serpentMenAlive && serpentMenDestroyed < serpentMenScoreToWin) {
+            postDelayed({
+                if (level == maxByakheeLevels + 7 && serpentMen.size < serpentMenAlive) {
+                    val x = Random.nextFloat() * (screenWidth - serpentManSize) + serpentManSize / 2
+                    val y = Random.nextFloat() * (screenHeight / 2)
+                    serpentMen.add(SerpentMan(x, y, serpentManSize, screenWidth, screenHeight, player))
+                }
+            }, 1500) // Délai de réapparition
+        }
+    }
+
+    // AJOUT: Méthode d'extension pour la collision joueur <-> Homme-Serpent
+    private fun Player.intersectsSerpentMan(serpentMan: SerpentMan): Boolean {
+        val distance = kotlin.math.hypot(x - serpentMan.x, y - serpentMan.y)
+        return distance < (size / 2 + serpentMan.size / 2)
+    }
 
     // Modifiée pour accepter le nombre de vies à perdre
     private fun playerLosesLife(livesToLose: Int = 1) {
