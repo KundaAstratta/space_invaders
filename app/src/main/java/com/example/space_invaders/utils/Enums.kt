@@ -10,7 +10,8 @@ class Enums  {
         COLOUR_OUT_OF_SPACE,
         LUNAR_SPACE,
         ANTARTIC,
-        DREAMLANDS
+        DREAMLANDS,
+        SERPENT_TEMPLE
         // Ajoutez d'autres types de fond ici au besoin
     }
 }
