@@ -1,4 +1,6 @@
+/*
 package com.example.space_invaders.entities.player
+
 
 import android.graphics.Canvas
 import android.graphics.Color
@@ -204,4 +206,207 @@ class Player(var x: Float, var y: Float, val size: Float) {
     }
 
 
+}
+*/
+package com.example.space_invaders.entities.player
+
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import com.example.space_invaders.backgrounds.Background
+import com.example.space_invaders.entities.ExplosionParticle
+import com.example.space_invaders.entities.byakhee.Byakhee
+import com.example.space_invaders.entities.deepone.DeepOne
+import com.example.space_invaders.entities.deepone.IchorousBlast
+import com.example.space_invaders.levels.shoggothLevel.MazeSystem
+import com.example.space_invaders.utils.Enums.BackgroundType
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
+import kotlin.random.Random
+
+class Player(var x: Float, var y: Float, val size: Float) {
+    var lives = 300
+    val maxLives = 300 // Ajout pour un calcul de pourcentage simple
+    var isAlive = true
+    var lifeLossAnimation: LifeLossAnimation? = null
+
+    // NOUVEAU : Variables pour le nouveau design
+    private var angleRotation: Float = 0f
+    private val sceauPath = Path()
+    private var tempsPulsation: Long = 0
+
+    init {
+        // Pré-calculer le chemin du sceau (ici, une étoile à 6 branches)
+        val rayonSceau = size / 2
+        sceauPath.moveTo(x, y - rayonSceau)
+        for (i in 1..5) {
+            val angle = i * 2 * PI / 6
+            sceauPath.lineTo(
+                x + (rayonSceau * sin(angle)).toFloat(),
+                y - (rayonSceau * cos(angle)).toFloat()
+            )
+        }
+        sceauPath.close()
+    }
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        if (!isAlive) return
+
+        tempsPulsation += 16 // Simule le passage du temps pour l'animation de pulsation
+
+        val healthPercentage = lives.toFloat() / maxLives
+
+        // Vitesse de rotation et couleur du sceau dépendent de la vie
+        val rotationSpeed = 0.5f + (1f - healthPercentage) * 2f // Tourne plus vite quand la vie est basse
+        val sceauColor = when {
+            healthPercentage > 0.5f -> Color.CYAN
+            healthPercentage > 0.25f -> Color.YELLOW
+            else -> Color.MAGENTA
+        }
+
+        // 1. Dessiner l'aura extérieure
+        paint.style = Paint.Style.FILL
+        val auraColor = Color.argb(
+            (50 + (1f - healthPercentage) * 100).toInt(), // Plus opaque quand la vie est basse
+            Color.red(sceauColor),
+            Color.green(sceauColor),
+            Color.blue(sceauColor)
+        )
+        paint.color = auraColor
+        canvas.drawCircle(x, y, size / 2 * (1.2f + (1 - healthPercentage) * 0.5f), paint)
+
+
+        // 2. Dessiner le sceau arcanique rotatif
+        canvas.save()
+        angleRotation = (angleRotation + rotationSpeed) % 360
+        canvas.rotate(angleRotation, x, y)
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f + (1f - healthPercentage) * 4f // Plus épais quand la vie est basse
+        paint.color = sceauColor
+
+        // Dessine une étoile simple
+        val radius = size / 2
+        for(i in 0..5){
+            val angleStart = i * 2 * PI / 3
+            val angleEnd = (i + 1) * 2 * PI / 3
+            canvas.drawLine(
+                x + (radius * sin(angleStart)).toFloat(),
+                y - (radius * cos(angleStart)).toFloat(),
+                x + (radius * sin(angleEnd)).toFloat(),
+                y - (radius * cos(angleEnd)).toFloat(),
+                paint
+            )
+        }
+
+        canvas.restore()
+
+
+        // 3. Dessiner le noyau d'énergie central
+        paint.style = Paint.Style.FILL
+        val pulsation = sin(tempsPulsation * 0.05) * (size / 10f) // Le noyau pulse
+        val coreRadius = (size / 4f) + pulsation.toFloat()
+
+        // La couleur du noyau passe du blanc au rouge sang
+        val coreColor = Color.rgb(
+            255,
+            (255 * healthPercentage).toInt(),
+            (255 * healthPercentage).toInt()
+        )
+        paint.color = coreColor
+        canvas.drawCircle(x, y, coreRadius, paint)
+
+
+        // Dessiner l'animation de perte de vie si elle existe
+        lifeLossAnimation?.let { animation ->
+            animation.draw(canvas, paint)
+            animation.update()
+            if (animation.isFinished()) {
+                lifeLossAnimation = null
+            }
+        }
+    }
+
+    // --- AUCUN CHANGEMENT DANS LA MÉCANIQUE CI-DESSOUS ---
+    // Toutes les fonctions de mouvement, de collision et de vie restent identiques.
+
+    fun moveTo(
+        newX: Float,
+        newY: Float,
+        screenWidth: Float,
+        screenHeight: Float,
+        structures: List<Background.Structure>,
+        mazeSystem: MazeSystem? = null,
+        currentLevel: BackgroundType = BackgroundType.DEFAULT
+    ) {
+        var finalX = newX.coerceIn(size / 2, screenWidth - size / 2)
+        var finalY = newY.coerceIn(size / 2, screenHeight - size / 2)
+
+        if (currentLevel == BackgroundType.ANTARTIC) {
+            x = finalX
+            y = finalY
+            return
+        }
+
+        if (mazeSystem != null) {
+            val movement = mazeSystem.getValidMovement(x, y, finalX, finalY, size / 2)
+            finalX = movement.first
+            finalY = movement.second
+        } else {
+            var canMove = true
+            for (structure in structures) {
+                if (structure.intersectsPlayerVersusStruct(finalX, finalY, size)) {
+                    canMove = false
+                    break
+                }
+            }
+            if (!canMove) {
+                return
+            }
+        }
+
+        x = finalX
+        y = finalY
+    }
+
+    fun hit(livesToLose: Int = 1): Boolean {
+        if (!isAlive) return false
+        lives -= livesToLose
+        if (lives <= 0) {
+            lives = 0
+            isAlive = false
+            lifeLossAnimation = null
+        } else {
+            isAlive = true
+            lifeLossAnimation = LifeLossAnimation(x, y - size / 2, livesToLose)
+        }
+        return isAlive
+    }
+
+    fun intersectsByakhee(byakhee: Byakhee): Boolean {
+        val distance = kotlin.math.hypot(x - byakhee.x - byakhee.width / 2, y - byakhee.y - byakhee.height / 2)
+        return distance < size / 2 + kotlin.math.min(byakhee.width, byakhee.height) / 2
+    }
+
+    fun intersectsDeepOne(deepOne: DeepOne): Boolean {
+        val distance = kotlin.math.hypot(x - deepOne.x - deepOne.width / 2, y - deepOne.y - deepOne.height / 2)
+        return distance < size / 2 + kotlin.math.min(deepOne.width, deepOne.height) / 2
+    }
+
+    fun intersectsIchorousBlast(blast: IchorousBlast): Boolean {
+        val distance = hypot(x - blast.x, y - blast.y)
+        return distance < size / 2 + blast.radius
+    }
+
+    fun createPlayerExplosion(explosions: MutableList<List<ExplosionParticle>>) {
+        val rippleCount = 5
+        val baseColor = Color.YELLOW
+        val particles = List(rippleCount) {
+            ExplosionParticle(x, y, initialSize = 20f, maxSize = 200f, growthRate = Random.nextFloat() * 5 + 2, color = baseColor)
+        }
+        explosions.add(particles)
+    }
 }

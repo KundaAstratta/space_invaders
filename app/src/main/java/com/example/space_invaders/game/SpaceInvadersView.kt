@@ -14,6 +14,8 @@ import com.example.space_invaders.backgrounds.Background
 import com.example.space_invaders.entities.Bullet
 import com.example.space_invaders.entities.byakhee.Byakhee
 import com.example.space_invaders.entities.ExplosionParticle
+import com.example.space_invaders.entities.azathoth.Azathoth
+import com.example.space_invaders.entities.azathoth.ChaoticDancer
 import com.example.space_invaders.entities.coloroutofspace.ColorOutOfSpace
 import com.example.space_invaders.entities.cthulhu.Tentacle
 import com.example.space_invaders.entities.deepone.DeepOne
@@ -39,7 +41,7 @@ import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.random.Random
 
-class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : View(context) {
+class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit, private val onGameWin: () -> Unit) : View(context) {
 
     private lateinit var player: Player
     private val bullets = mutableListOf<Bullet>()
@@ -51,10 +53,12 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private var screenWidth = 0f
     private var screenHeight = 0f
 
-    private var level = 1 // 8 TEST TEST the level you want
+    private var level = 1 // 8 TEST TEST the level you want TEST TEST
     private var isPlayerTouched = false
     private var touchOffsetX = 0f
     private var touchOffsetY = 0f
+
+    private var lastFrameTime: Long = 0L
 
     // Créer un objet Background
     private lateinit var background: Background
@@ -66,9 +70,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val byakhees = mutableListOf<Byakhee>()
     private var speedMultiplier = 1f
     private val explosions = mutableListOf<List<ExplosionParticle>>()
-    private val maxByakheeLevels = 1// 12  Définissez le nombre de niveaux Byakhee souhaités
-    private val numByakheeRows = 1//1  //  lignes //ATTENTION
-    private val numByakheeCols = 5//2
+    private val maxByakheeLevels = 1//REAL 10  Définissez le nombre de niveaux Byakhee souhaités
+    private val numByakheeRows = 1//REAL 1  //  lignes //ATTENTION
+    private val numByakheeCols = 2//REAL 5
     private val byakheePadding = 10f
     private var byakheeWidth = 0f
     private var byakheeHeight = 0f
@@ -82,7 +86,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val spawnInterval: Long = 5000 // 5000 millisecondes = 5s
     private var deepOneScore = 0
     // Nombre de DeepOnes à détruire pour gagner le niveau
-    private val deepOneScoreToWin = 7//70
+    private val deepOneScoreToWin = 7//REAL 70
     private var deepOnesDestroyed = 0
     //Tentacles Chtulhu
     private val tentacles = mutableListOf<Tentacle>()
@@ -103,20 +107,20 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     // Shoggoth related variables
     private val shoggoths = mutableListOf<Shoggoth>()
     private var shoggothSize = 0f
-    private var shoggothScoreToWin = 1// 50  Nombre de Shoggoths à détruire
+    private var shoggothScoreToWin = 2//REAL 10  Nombre de Shoggoths à détruire
     private var shoggothsDestroyed = 0
     private lateinit var mazeSystem: MazeSystem
 
     // Ajouter ces variables pour le niveau Elder Thing
     private val elderThings = mutableListOf<ElderThing>()
     private var elderThingSize = 0f
-    private var elderThingScoreToWin = 10 // 100 Nombre d'Elder Things à détruire
+    private var elderThingScoreToWin = 10 //REAL 100 Nombre d'Elder Things à détruire
     private var elderThingsDestroyed = 0
 
     // --- Variables spécifiques au niveau Nightgaunt ---
     private var nightgauntSwarm: NightgauntSwarm? = null
     private var nightgauntsDestroyed = 0
-    private val nightgauntScoreToWin = 100 //3000
+    private val nightgauntScoreToWin = 100 //REAL 3000
     private var nightgauntSize = 0f // Sera initialisé dans onSizeChanged
 
     // --- Variables spécifiques au niveau Homme serpent ---
@@ -125,8 +129,15 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     private val serpentManIllusions = mutableListOf<SerpentManIllusion>()
     private var serpentManSize = 0f
     private var serpentMenDestroyed = 0
-    private var serpentMenAlive = 15 // 3
-    private val serpentMenScoreToWin = 500 // 15   Nombre d'Hommes-Serpents à vaincre
+    private var serpentMenAlive = 3 //REAL 10
+    private val serpentMenScoreToWin = 5 //REAL 500   Nombre d'Hommes-Serpents à vaincre
+
+    // --- Variables spécifiques au niveau Azathoth ---
+    private var azathoth: Azathoth? = null
+    private val dancers = mutableListOf<ChaoticDancer>()
+    private val dancersMaxScreen = 10 //REAL 25
+    private val dancersToWin = 5//REAL 1000
+    private var dancersKilled = 0
 
     // --- Variables pour la capture du joueur ---
     private var isPlayerCaptured = false
@@ -229,6 +240,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        val currentTime = System.currentTimeMillis()
+        val deltaTime = currentTime - lastFrameTime
+        lastFrameTime = currentTime
+
         background.draw(canvas)
 
         // Dessiner le labyrinthe
@@ -274,6 +289,10 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
                 serpentManProjectiles.forEach { it.draw(canvas) }
                 serpentManIllusions.forEach { it.draw(canvas) }
             }
+            level ==  (maxByakheeLevels + 8) -> {
+                azathoth?.draw(canvas)
+                dancers.forEach { it.draw(canvas) }
+            }
         }
 
         bullets.forEach { it.draw(canvas, paint) }
@@ -313,7 +332,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             canvas.drawRect(0f, 0f, screenWidth, screenHeight, paint)
         }
 
-        update()
+        update(deltaTime)
         invalidate()
 
     }
@@ -352,7 +371,7 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
     }
 
     // Mettre à jour l'état du jeu
-    private fun update() {
+    private fun update(deltaTime: Long) {
 
         val currentTime = System.currentTimeMillis()
 
@@ -416,7 +435,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             level == (maxByakheeLevels + 4) -> updateShoggoth()
             level == (maxByakheeLevels + 5) -> updateElderThing()
             level == (maxByakheeLevels + 6) -> updateNightgaunt()
-            level == (maxByakheeLevels + 7) -> updateSerpentMen() // AJOUT
+            level == (maxByakheeLevels + 7) -> updateSerpentMen()
+            level == (maxByakheeLevels + 8) -> updateAzathothLevel(deltaTime) // AJOUT
         }
 
         //explosion
@@ -434,7 +454,8 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             (level == (maxByakheeLevels + 4) && shoggothsDestroyed >= shoggothScoreToWin) ||
             (level == (maxByakheeLevels + 5) && elderThingsDestroyed >= elderThingScoreToWin) ||
             (level == (maxByakheeLevels + 6) && nightgauntsDestroyed >= nightgauntScoreToWin) ||
-            (level == (maxByakheeLevels + 7) && serpentMenDestroyed >= serpentMenScoreToWin) // AJOUT
+            (level == (maxByakheeLevels + 7) && serpentMenDestroyed >= serpentMenScoreToWin) ||
+            (level == (maxByakheeLevels + 8) && dancersKilled >= dancersToWin) // AJOUT
         ) {
             startNextLevel()
         }
@@ -460,6 +481,9 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         shoggothsDestroyed = 0 // Compteur de Shoggoths détruits
         elderThingsDestroyed = 0 // Réinitialiser le compteur d'Elder Things détruits
         serpentMenDestroyed = 0 // AJOUT: Réinitialiser compteur Hommes-Serpents
+        dancers.clear()
+        dancersKilled = 0
+        azathoth = null
 
         isTransitioning = true // Démarrer la transition
         transitionAlpha = 255 // Réinitialiser l'alpha
@@ -540,6 +564,21 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
             level == (maxByakheeLevels + 7) -> {
                 createSerpentMen()
                 background.switchBackground(BackgroundType.SERPENT_TEMPLE)
+            }
+            level == (maxByakheeLevels + 8) -> { // AJOUT
+                createAzathothLevel()
+                background.switchBackground(BackgroundType.AZATHOTH_REALM)
+
+                // AJOUT : Le repositionnement se fait UNIQUEMENT ici
+                val playerSize = screenWidth / 10
+                player.x = screenWidth / 2
+                player.y = screenHeight - playerSize
+            }
+            else -> { // Tous les niveaux sont terminés
+                //onGameOver() // Ou un écran de victoire
+                onGameWin() // On déclenche la victoire !
+                // On s'assure que le jeu s'arrête en attendant la transition
+                //level = 999
             }
         }
 
@@ -1364,6 +1403,73 @@ class SpaceInvadersView(context: Context, private val onGameOver: () -> Unit) : 
         val distance = kotlin.math.hypot(x - serpentMan.x, y - serpentMan.y)
         return distance < (size / 2 + serpentMan.size / 2)
     }
+
+
+    // AJOUT : AZATHOTH
+    // AJOUT : AZATHOTH
+    // AJOUT : AZATHOTH
+    private fun createAzathothLevel() {
+        dancers.clear()
+        dancersKilled = 0
+        azathoth = Azathoth(screenWidth / 2, screenHeight / 2, screenWidth / 3f)
+        repeat(dancersMaxScreen) {
+            dancers.add(ChaoticDancer(screenWidth / 2, screenHeight / 2, player))
+        }
+
+    }
+
+    private fun updateAzathothLevel(deltaTime: Long) {
+        // 1. Mettre à jour Azathoth et les danseurs
+        azathoth?.update(deltaTime)
+        dancers.forEach { it.update(deltaTime) }
+
+        // 3. Gérer les collisions
+        // 3.1. Collision Joueur <-> Azathoth
+        azathoth?.let {
+            if (it.checkCollisionAvecJoueur(player)) {
+                playerLosesLife(5)
+                // On pourrait ajouter un effet de recul pour le joueur ici
+            }
+        }
+
+        val danseurIter = dancers.iterator()
+        while(danseurIter.hasNext()) {
+            val danseur = danseurIter.next()
+
+            // Joueur <-> Danseur
+            if (danseur.checkCollisionAvecJoueur(player)) {
+                playerLosesLife(2)
+                danseurIter.remove() // Le danseur est détruit au contact
+                continue // Passe au danseur suivant pour éviter d'autres vérifications
+            }
+
+            // Tirs du joueur <-> Danseur
+            val bulletIter = bullets.iterator()
+            while(bulletIter.hasNext()) {
+                val bullet = bulletIter.next()
+                if (hypot((bullet.x - danseur.x).toDouble(), (bullet.y - danseur.y).toDouble()) < danseur.rayonHitbox) {
+                    bulletIter.remove()
+                    if (danseur.takeDamage()) { // takeDamage renvoie true si le danseur est mort
+                        danseurIter.remove()
+                        dancersKilled++
+                        score += 50
+                        // temporaryScores.add(...)
+                        break // Sort de la boucle des tirs, car le danseur est mort
+                    }
+                }
+            }
+        }
+
+        // 3. Faire réapparaître les danseurs pour en avoir toujours 10
+        while (dancers.size < dancersMaxScreen && dancersKilled < dancersToWin) {
+            dancers.add(ChaoticDancer(screenWidth / 2, screenHeight / 2, player))
+        }
+
+    }
+
+
+
+
 
     // Modifiée pour accepter le nombre de vies à perdre
     private fun playerLosesLife(livesToLose: Int = 1) {

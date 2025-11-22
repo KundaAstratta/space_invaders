@@ -20,8 +20,10 @@ class GameOverActivity : AppCompatActivity() { // Ou Fragment si vous utilisez d
 
         scoreTextView = findViewById(R.id.scoreTextView) // Assurez-vous d'avoir ce TextView dans votre layout
 
-        val finalScore = intent.getIntExtra("finalScore", 0) // Récupérez le score depuis l'intent
-        scoreTextView.text = "Final score : $finalScore"
+        //val finalScore = intent.getIntExtra("finalScore", 0) // Récupérez le score depuis l'intent
+        //scoreTextView.text = "Final score : $finalScore"
+        scoreTextView.text = "Reboot...."
+
 
         // Démarrez un délai avant de revenir à l'écran de début
         Handler(Looper.getMainLooper()).postDelayed({

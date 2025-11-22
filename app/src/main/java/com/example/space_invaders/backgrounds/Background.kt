@@ -46,6 +46,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.ANTARTIC -> R.drawable.antartic_background
             BackgroundType.DREAMLANDS -> R.drawable.dreamland_background
             BackgroundType.SERPENT_TEMPLE -> R.drawable.serpent_temple_background
+            BackgroundType.AZATHOTH_REALM -> R.drawable.azathoth_background
         }
 
         val options = BitmapFactory.Options().apply {
@@ -95,8 +96,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
         structures.clear()
         when (backgroundType) {
             BackgroundType.DEFAULT -> generateDefault()
-            BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins() // TEST TEST
-            //BackgroundType.COSMIC_HORROR_RUINS -> generateSerpentTempleStructures() //TEST TEST level you want
+            //BackgroundType.COSMIC_HORROR_RUINS -> generateByakheeRuins() // TEST TEST
+            BackgroundType.COSMIC_HORROR_RUINS -> generateSerpentTempleStructures() //TEST TEST level you want
             BackgroundType.DHOLE_REALM -> generateDholeRealm()
             BackgroundType.RLYEH -> generateRlyehStructures()
             BackgroundType.COLOUR_OUT_OF_SPACE -> generateColorOutOfSpace()
@@ -104,6 +105,7 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.ANTARTIC -> generateAntarticStructures()
             BackgroundType.DREAMLANDS -> generateDreamlandsStructures()
             BackgroundType.SERPENT_TEMPLE -> generateSerpentTempleStructures()
+            BackgroundType.AZATHOTH_REALM -> generateAzathothStructures()
         }
     }
 
@@ -151,6 +153,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
 
     private fun generateLunarSpaceStructures() {
         // Implémentez la génération du décor pour le monde de Lunar Space
+    }
+
+    private fun generateAzathothStructures() {
+        // Implémenter si nécessaire
     }
 
     // Redistribue les structures après le changement de fond
@@ -243,7 +249,8 @@ class Background(private val context: Context, private val screenWidth: Float, p
             BackgroundType.LUNAR_SPACE -> drawLunarSpaceStructures(canvas)
             BackgroundType.ANTARTIC -> drawAntarticStructures(canvas)
             BackgroundType.DREAMLANDS -> drawDreamlandsStructures(canvas)
-            BackgroundType.SERPENT_TEMPLE -> drawSerpentTempleStructures(canvas) // AJOUT
+            BackgroundType.SERPENT_TEMPLE -> drawSerpentTempleStructures(canvas)
+            BackgroundType.AZATHOTH_REALM -> drawAzathothStructures(canvas)// AJOUT
         }
     }
 
@@ -311,6 +318,10 @@ class Background(private val context: Context, private val screenWidth: Float, p
         for (structure in structures) {
             structure.draw(canvas)
         }
+    }
+
+    private fun drawAzathothStructures(canvas: Canvas) {
+        //Nothing
     }
 
     private fun drawStars(canvas: Canvas) {

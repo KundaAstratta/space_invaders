@@ -11,7 +11,8 @@ class Enums  {
         LUNAR_SPACE,
         ANTARTIC,
         DREAMLANDS,
-        SERPENT_TEMPLE
+        SERPENT_TEMPLE,
+        AZATHOTH_REALM
         // Ajoutez d'autres types de fond ici au besoin
     }
 }

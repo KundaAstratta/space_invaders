@@ -7,7 +7,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 class Dhole(var x: Float, var y: Float, val circleSize: Float) {
-    private val numCircles = 5//15
+    private val numCircles = 5//REAL 15
     private val circles = mutableListOf<DholeCircle>()
     private var time = 0f
     private var invincibilityFrames = 0
