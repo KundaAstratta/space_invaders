@@ -25,6 +25,7 @@
         <activity android:name=".game.activity.GameOverActivity" />
         <activity android:name=".game.activity.LevelIntroActivity" />
         <activity android:name=".game.activity.MainActivity" />
+        <activity android:name=".game.activity.GameWinActivity" android:theme="@style/Theme.AppCompat.NoActionBar" />
     </application>
 
 </manifest>

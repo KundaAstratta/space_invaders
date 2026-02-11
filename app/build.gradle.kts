@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.space_invaders"
-    compileSdk = 34
+    namespace = "com.outer.invaders"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.space_invaders"
+        applicationId = "com.outer.invaders"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -50,7 +50,7 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.androidx.appcompat.v161)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
