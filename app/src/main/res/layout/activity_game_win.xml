@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    tools:context=".game.activity.GameWinActivity">
+
+    <TextView
+        android:id="@+id/winTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:text="YOU WIN"
+        android:textColor="@android:color/white"
+        android:textSize="56sp"
+        android:fontFamily="monospace"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/winTextView"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text="The Nuclear Chaos is silenced... for now."
+        android:textColor="@android:color/darker_gray"
+        android:textSize="18sp"
+        android:fontFamily="serif" />
+
+</RelativeLayout>
